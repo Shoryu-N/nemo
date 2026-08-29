@@ -1,121 +1,119 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { AiPanel } from './components/AiPanel'
+import { ChatMessageList } from './components/ChatMessageList'
+import { MessageInput } from './components/MessageInput'
+import { UserSwitcher } from './components/UserSwitcher'
+import type {
+  AiAnalysisResult,
+  ChatMessage,
+  DisplayUser,
+  DisplayUserId,
+} from './types/chat'
 import './App.css'
 
+const displayUsers: DisplayUser[] = [
+  { id: 'alice', name: 'Alice' },
+  { id: 'bob', name: 'Bob' },
+]
+
+const initialMessages: ChatMessage[] = [
+  {
+    id: 'message-1',
+    senderId: 'alice',
+    senderName: 'Alice',
+    text: 'Hi Bob, can we review the study project outline before Friday?',
+    createdAtLabel: '09:10',
+  },
+  {
+    id: 'message-2',
+    senderId: 'bob',
+    senderName: 'Bob',
+    text: 'Yes. I can check the Firebase section tonight and note any missing parts.',
+    createdAtLabel: '09:12',
+  },
+  {
+    id: 'message-3',
+    senderId: 'alice',
+    senderName: 'Alice',
+    text: 'Great. I will prepare fictional chat examples for the AI analysis demo.',
+    createdAtLabel: '09:15',
+  },
+]
+
+const placeholderAnalysis: AiAnalysisResult = {
+  summary:
+    'Alice and Bob are coordinating a review of their study project outline.',
+  importantInformation: [
+    'Bob will review the Firebase section tonight.',
+    'Alice will prepare fictional chat examples for the demo.',
+    'The outline should be reviewed before Friday.',
+  ],
+  suggestedReply:
+    'Thanks, Alice. I will share my Firebase notes after reviewing them tonight.',
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [selectedUserId, setSelectedUserId] =
+    useState<DisplayUserId>('alice')
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const [messageText, setMessageText] = useState('')
+
+  const selectedUser = displayUsers.find((user) => user.id === selectedUserId)
+
+  function handleSendMessage() {
+    const text = messageText.trim()
+
+    if (!text || !selectedUser) {
+      return
+    }
+
+    const nextMessage: ChatMessage = {
+      id: `message-${messages.length + 1}`,
+      senderId: selectedUser.id,
+      senderName: selectedUser.name,
+      text,
+      createdAtLabel: 'Now',
+    }
+
+    setMessages((currentMessages) => [...currentMessages, nextMessage])
+    setMessageText('')
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <main className="app-shell">
+      <header className="app-header">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+          <p className="eyebrow">Academic Phase 2 PoC</p>
+          <h1>AI-Assisted Chat</h1>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+        <p className="room-label">Room: main</p>
+      </header>
 
-      <div className="ticks"></div>
+      <div className="workspace">
+        <section className="chat-column" aria-label="Chat workspace">
+          <UserSwitcher
+            users={displayUsers}
+            selectedUserId={selectedUserId}
+            onSelectUser={setSelectedUserId}
+          />
+          <ChatMessageList
+            messages={messages}
+            selectedUserId={selectedUserId}
+          />
+          <MessageInput
+            value={messageText}
+            onChange={setMessageText}
+            onSend={handleSendMessage}
+          />
+        </section>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+        <AiPanel
+          analysis={placeholderAnalysis}
+          onAnalyze={() => undefined}
+          onUseReply={() => setMessageText(placeholderAnalysis.suggestedReply)}
+        />
+      </div>
+    </main>
   )
 }
 
