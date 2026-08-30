@@ -4,9 +4,9 @@ import { ChatMessageList } from './components/ChatMessageList'
 import { MessageInput } from './components/MessageInput'
 import { UserSwitcher } from './components/UserSwitcher'
 import { useAnonymousAuth } from './hooks/useAnonymousAuth'
+import { useMessages } from './hooks/useMessages'
 import type {
   AiAnalysisResult,
-  ChatMessage,
   DisplayUser,
   DisplayUserId,
 } from './types/chat'
@@ -15,30 +15,6 @@ import './App.css'
 const displayUsers: DisplayUser[] = [
   { id: 'alice', name: 'Alice' },
   { id: 'bob', name: 'Bob' },
-]
-
-const initialMessages: ChatMessage[] = [
-  {
-    id: 'message-1',
-    senderId: 'alice',
-    senderName: 'Alice',
-    text: 'Hi Bob, can we review the study project outline before Friday?',
-    createdAtLabel: '09:10',
-  },
-  {
-    id: 'message-2',
-    senderId: 'bob',
-    senderName: 'Bob',
-    text: 'Yes. I can check the Firebase section tonight and note any missing parts.',
-    createdAtLabel: '09:12',
-  },
-  {
-    id: 'message-3',
-    senderId: 'alice',
-    senderName: 'Alice',
-    text: 'Great. I will prepare fictional chat examples for the AI analysis demo.',
-    createdAtLabel: '09:15',
-  },
 ]
 
 const placeholderAnalysis: AiAnalysisResult = {
@@ -55,30 +31,31 @@ const placeholderAnalysis: AiAnalysisResult = {
 
 function App() {
   const { user, isLoading, error } = useAnonymousAuth()
+  const {
+    messages,
+    isLoading: areMessagesLoading,
+    isSending,
+    error: messagesError,
+    sendMessage,
+  } = useMessages(Boolean(user) && !isLoading && !error)
   const [selectedUserId, setSelectedUserId] =
     useState<DisplayUserId>('alice')
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [messageText, setMessageText] = useState('')
 
   const selectedUser = displayUsers.find((user) => user.id === selectedUserId)
 
-  function handleSendMessage() {
+  async function handleSendMessage() {
     const text = messageText.trim()
 
     if (!text || !selectedUser) {
       return
     }
 
-    const nextMessage: ChatMessage = {
-      id: `message-${messages.length + 1}`,
-      senderId: selectedUser.id,
-      senderName: selectedUser.name,
-      text,
-      createdAtLabel: 'Now',
-    }
+    const didSend = await sendMessage(selectedUser, text)
 
-    setMessages((currentMessages) => [...currentMessages, nextMessage])
-    setMessageText('')
+    if (didSend) {
+      setMessageText('')
+    }
   }
 
   if (isLoading) {
@@ -130,11 +107,14 @@ function App() {
           <ChatMessageList
             messages={messages}
             selectedUserId={selectedUserId}
+            isLoading={areMessagesLoading}
+            error={messagesError}
           />
           <MessageInput
             value={messageText}
             onChange={setMessageText}
             onSend={handleSendMessage}
+            isSending={isSending}
           />
         </section>
 

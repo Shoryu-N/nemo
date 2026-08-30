@@ -118,6 +118,15 @@
   list-style: none;
 }
 
+.state-message {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+}
+
+.error-message {
+  color: #b91c1c;
+}
+
 .message {
   max-width: 78%;
   padding: 12px 14px;

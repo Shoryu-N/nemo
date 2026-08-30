@@ -1,12 +1,18 @@
+import { maxMessageLength } from '../types/chat'
+
 type MessageInputProps = {
   value: string
   onChange: (value: string) => void
   onSend: () => void
+  isSending: boolean
 }
 
-const maxMessageLength = 1000
-
-export function MessageInput({ value, onChange, onSend }: MessageInputProps) {
+export function MessageInput({
+  value,
+  onChange,
+  onSend,
+  isSending,
+}: MessageInputProps) {
   const trimmedValue = value.trim()
 
   return (
@@ -28,8 +34,8 @@ export function MessageInput({ value, onChange, onSend }: MessageInputProps) {
       />
       <div className="input-actions">
         <span>{value.length}/{maxMessageLength}</span>
-        <button type="submit" disabled={trimmedValue.length === 0}>
-          Send
+        <button type="submit" disabled={trimmedValue.length === 0 || isSending}>
+          {isSending ? 'Sending...' : 'Send'}
         </button>
       </div>
     </form>

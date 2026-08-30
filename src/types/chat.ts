@@ -5,6 +5,8 @@ export type DisplayUser = {
   name: 'Alice' | 'Bob'
 }
 
+export const maxMessageLength = 1000
+
 export type ChatMessage = {
   id: string
   senderId: DisplayUserId
