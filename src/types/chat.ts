@@ -20,3 +20,13 @@ export type AiAnalysisResult = {
   importantInformation: string[]
   suggestedReply: string
 }
+
+export function normalizeMessageText(text: string) {
+  return text.trim()
+}
+
+export function isValidMessageText(text: string) {
+  const normalizedText = normalizeMessageText(text)
+
+  return /\S/u.test(normalizedText) && normalizedText.length <= maxMessageLength
+}

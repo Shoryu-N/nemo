@@ -15,7 +15,9 @@ import {
 } from 'firebase/firestore'
 import { getFirebaseApp } from './app'
 import {
+  isValidMessageText,
   maxMessageLength,
+  normalizeMessageText,
   type ChatMessage,
   type DisplayUser,
   type DisplayUserId,
@@ -73,9 +75,9 @@ export async function sendMessageToMainRoom({
   senderName,
   text,
 }: SendMessageInput) {
-  const trimmedText = text.trim()
+  const trimmedText = normalizeMessageText(text)
 
-  if (!trimmedText) {
+  if (!isValidMessageText(text)) {
     throw new Error('Message cannot be empty.')
   }
 

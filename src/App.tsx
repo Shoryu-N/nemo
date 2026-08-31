@@ -6,13 +6,23 @@ import { UserSwitcher } from './components/UserSwitcher'
 import { useAnonymousAuth } from './hooks/useAnonymousAuth'
 import { useAiAnalysis } from './hooks/useAiAnalysis'
 import { useMessages } from './hooks/useMessages'
-import type { DisplayUser, DisplayUserId } from './types/chat'
+import {
+  isValidMessageText,
+  normalizeMessageText,
+  type DisplayUser,
+  type DisplayUserId,
+} from './types/chat'
 import './App.css'
 
 const displayUsers: DisplayUser[] = [
   { id: 'alice', name: 'Alice' },
   { id: 'bob', name: 'Bob' },
 ]
+
+const initialDrafts: Record<DisplayUserId, string> = {
+  alice: '',
+  bob: '',
+}
 
 function App() {
   const { user, isLoading, error } = useAnonymousAuth()
@@ -24,32 +34,42 @@ function App() {
     sendMessage,
   } = useMessages(Boolean(user) && !isLoading && !error)
   const {
-    analysis,
-    analysisReplyAs,
-    isAnalyzing,
-    error: analysisError,
+    analyses,
+    isAnalyzingByUser,
+    errors: analysisErrors,
     requestAnalysis,
-    clearAnalysis,
+    clearAllAnalysis,
   } = useAiAnalysis()
   const [selectedUserId, setSelectedUserId] =
     useState<DisplayUserId>('alice')
-  const [messageText, setMessageText] = useState('')
+  const [drafts, setDrafts] =
+    useState<Record<DisplayUserId, string>>(initialDrafts)
 
   const selectedUser = displayUsers.find((user) => user.id === selectedUserId)
-  const currentAnalysis =
-    analysisReplyAs === selectedUserId ? analysis : null
+  const currentAnalysis = analyses[selectedUserId]
+  const isAnalyzing = isAnalyzingByUser[selectedUserId]
+  const analysisError = analysisErrors[selectedUserId]
+  const messageText = drafts[selectedUserId]
+
+  function setSelectedDraft(text: string) {
+    setDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [selectedUserId]: text,
+    }))
+  }
 
   async function handleSendMessage() {
-    const text = messageText.trim()
+    const text = normalizeMessageText(messageText)
 
-    if (!text || !selectedUser) {
+    if (!isValidMessageText(messageText) || !selectedUser) {
       return
     }
 
     const didSend = await sendMessage(selectedUser, text)
 
     if (didSend) {
-      setMessageText('')
+      setSelectedDraft('')
+      clearAllAnalysis()
     }
   }
 
@@ -100,7 +120,6 @@ function App() {
             onSelectUser={(userId) => {
               if (userId !== selectedUserId) {
                 setSelectedUserId(userId)
-                clearAnalysis()
               }
             }}
           />
@@ -112,7 +131,7 @@ function App() {
           />
           <MessageInput
             value={messageText}
-            onChange={setMessageText}
+            onChange={setSelectedDraft}
             onSend={handleSendMessage}
             isSending={isSending}
           />
@@ -125,7 +144,7 @@ function App() {
           onAnalyze={() => void requestAnalysis(selectedUserId)}
           onUseReply={() => {
             if (currentAnalysis?.suggestedReply) {
-              setMessageText(currentAnalysis.suggestedReply)
+              setSelectedDraft(currentAnalysis.suggestedReply)
             }
           }}
         />
