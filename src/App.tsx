@@ -4,30 +4,15 @@ import { ChatMessageList } from './components/ChatMessageList'
 import { MessageInput } from './components/MessageInput'
 import { UserSwitcher } from './components/UserSwitcher'
 import { useAnonymousAuth } from './hooks/useAnonymousAuth'
+import { useAiAnalysis } from './hooks/useAiAnalysis'
 import { useMessages } from './hooks/useMessages'
-import type {
-  AiAnalysisResult,
-  DisplayUser,
-  DisplayUserId,
-} from './types/chat'
+import type { DisplayUser, DisplayUserId } from './types/chat'
 import './App.css'
 
 const displayUsers: DisplayUser[] = [
   { id: 'alice', name: 'Alice' },
   { id: 'bob', name: 'Bob' },
 ]
-
-const placeholderAnalysis: AiAnalysisResult = {
-  summary:
-    'Alice and Bob are coordinating a review of their study project outline.',
-  importantInformation: [
-    'Bob will review the Firebase section tonight.',
-    'Alice will prepare fictional chat examples for the demo.',
-    'The outline should be reviewed before Friday.',
-  ],
-  suggestedReply:
-    'Thanks, Alice. I will share my Firebase notes after reviewing them tonight.',
-}
 
 function App() {
   const { user, isLoading, error } = useAnonymousAuth()
@@ -38,6 +23,12 @@ function App() {
     error: messagesError,
     sendMessage,
   } = useMessages(Boolean(user) && !isLoading && !error)
+  const {
+    analysis,
+    isAnalyzing,
+    error: analysisError,
+    requestAnalysis,
+  } = useAiAnalysis()
   const [selectedUserId, setSelectedUserId] =
     useState<DisplayUserId>('alice')
   const [messageText, setMessageText] = useState('')
@@ -119,9 +110,15 @@ function App() {
         </section>
 
         <AiPanel
-          analysis={placeholderAnalysis}
-          onAnalyze={() => undefined}
-          onUseReply={() => setMessageText(placeholderAnalysis.suggestedReply)}
+          analysis={analysis}
+          isAnalyzing={isAnalyzing}
+          error={analysisError}
+          onAnalyze={() => void requestAnalysis(selectedUserId)}
+          onUseReply={() => {
+            if (analysis?.suggestedReply) {
+              setMessageText(analysis.suggestedReply)
+            }
+          }}
         />
       </div>
     </main>
