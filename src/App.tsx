@@ -25,15 +25,19 @@ function App() {
   } = useMessages(Boolean(user) && !isLoading && !error)
   const {
     analysis,
+    analysisReplyAs,
     isAnalyzing,
     error: analysisError,
     requestAnalysis,
+    clearAnalysis,
   } = useAiAnalysis()
   const [selectedUserId, setSelectedUserId] =
     useState<DisplayUserId>('alice')
   const [messageText, setMessageText] = useState('')
 
   const selectedUser = displayUsers.find((user) => user.id === selectedUserId)
+  const currentAnalysis =
+    analysisReplyAs === selectedUserId ? analysis : null
 
   async function handleSendMessage() {
     const text = messageText.trim()
@@ -93,7 +97,12 @@ function App() {
           <UserSwitcher
             users={displayUsers}
             selectedUserId={selectedUserId}
-            onSelectUser={setSelectedUserId}
+            onSelectUser={(userId) => {
+              if (userId !== selectedUserId) {
+                setSelectedUserId(userId)
+                clearAnalysis()
+              }
+            }}
           />
           <ChatMessageList
             messages={messages}
@@ -110,13 +119,13 @@ function App() {
         </section>
 
         <AiPanel
-          analysis={analysis}
+          analysis={currentAnalysis}
           isAnalyzing={isAnalyzing}
           error={analysisError}
           onAnalyze={() => void requestAnalysis(selectedUserId)}
           onUseReply={() => {
-            if (analysis?.suggestedReply) {
-              setMessageText(analysis.suggestedReply)
+            if (currentAnalysis?.suggestedReply) {
+              setMessageText(currentAnalysis.suggestedReply)
             }
           }}
         />

@@ -33,6 +33,7 @@ service cloud.firestore {
     && isValidSender(request.resource.data.senderId, request.resource.data.senderName)
     && request.resource.data.text is string
     && request.resource.data.text.size() > 0
+    && request.resource.data.text.matches('.*\\S.*')
     && request.resource.data.text.size() <= 1000
     && request.resource.data.createdAt == request.time;
   }
