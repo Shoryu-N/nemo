@@ -24,6 +24,6 @@ dist-ssr
 *.sw?
 
 AGENTS.md
-docs/PROJECT_SPEC.md
+docs/*
 
 .agents/skills

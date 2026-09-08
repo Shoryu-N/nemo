@@ -29,6 +29,10 @@ const initialLoading: AiLoadingByUser = {
   bob: false,
 }
 
+function hasAnalysisState(state: AiAnalysisByUser | AiErrorByUser) {
+  return state.alice !== null || state.bob !== null
+}
+
 export function useAiAnalysis(): AiAnalysisState {
   const [analyses, setAnalyses] =
     useState<AiAnalysisByUser>(initialAnalyses)
@@ -39,8 +43,12 @@ export function useAiAnalysis(): AiAnalysisState {
 
   const clearAllAnalysis = useCallback(() => {
     analysisVersion.current += 1
-    setAnalyses(initialAnalyses)
-    setErrors(initialErrors)
+    setAnalyses((currentAnalyses) =>
+      hasAnalysisState(currentAnalyses) ? initialAnalyses : currentAnalyses,
+    )
+    setErrors((currentErrors) =>
+      hasAnalysisState(currentErrors) ? initialErrors : currentErrors,
+    )
   }, [])
 
   async function requestAnalysis(replyAs: DisplayUserId) {
