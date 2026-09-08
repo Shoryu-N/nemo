@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run --dir test",
+    "test": "vitest run --dir test/unit",
+    "test:rules": "XDG_CONFIG_HOME=.firebase-config firebase emulators:exec --config firebase.rules-test.json --project demo-nemo-rules --only firestore \"vitest run --dir test/rules\"",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

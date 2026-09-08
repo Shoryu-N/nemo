@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateAiAnalysisResult } from '../src/firebase/functions'
+import { validateAiAnalysisResult } from '../../src/firebase/functions'
 
 const validResult = {
   summary: 'Alice and Bob agreed to meet tomorrow.',

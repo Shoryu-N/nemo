@@ -3,7 +3,7 @@ import {
   isValidMessageText,
   maxMessageLength,
   normalizeMessageText,
-} from '../src/types/chat'
+} from '../../src/types/chat'
 
 describe('message text helpers', () => {
   it('rejects an empty string', () => {
