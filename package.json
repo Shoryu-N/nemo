@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run --dir test/unit",
     "test:rules": "XDG_CONFIG_HOME=.firebase-config firebase emulators:exec --config firebase.rules-test.json --project demo-nemo-rules --only firestore \"vitest run --dir test/rules\"",
+    "test:integration": "npm --prefix functions run build && XDG_CONFIG_HOME=.firebase-config VITE_FIREBASE_API_KEY=demo-key VITE_FIREBASE_AUTH_DOMAIN=demo-nemo-integration.firebaseapp.com VITE_FIREBASE_PROJECT_ID=demo-nemo-integration VITE_FIREBASE_APP_ID=demo-app-id VITE_USE_FIREBASE_AUTH_EMULATOR=true VITE_FIREBASE_AUTH_EMULATOR_URL=http://127.0.0.1:19099 VITE_USE_FIRESTORE_EMULATOR=true VITE_FIRESTORE_EMULATOR_HOST=127.0.0.1 VITE_FIRESTORE_EMULATOR_PORT=18081 VITE_USE_FIREBASE_FUNCTIONS_EMULATOR=true VITE_FIREBASE_FUNCTIONS_EMULATOR_HOST=127.0.0.1 VITE_FIREBASE_FUNCTIONS_EMULATOR_PORT=15001 VITE_FIREBASE_FUNCTIONS_REGION=us-central1 firebase emulators:exec --config firebase.integration-test.json --project demo-nemo-integration --only auth,firestore,functions \"vitest run --dir test/integration\"",
     "preview": "vite preview"
   },
   "dependencies": {
