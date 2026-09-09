@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AiPanel } from './components/AiPanel'
 import { ChatMessageList } from './components/ChatMessageList'
 import { MessageInput } from './components/MessageInput'
@@ -22,6 +22,17 @@ const displayUsers: DisplayUser[] = [
 const initialDrafts: Record<DisplayUserId, string> = {
   alice: '',
   bob: '',
+}
+
+function createConversationSignature(messages: ReturnType<typeof useMessages>['messages']) {
+  return JSON.stringify(
+    messages.map((message) => ({
+      id: message.id,
+      senderId: message.senderId,
+      senderName: message.senderName,
+      text: message.text,
+    })),
+  )
 }
 
 function App() {
@@ -50,6 +61,32 @@ function App() {
   const isAnalyzing = isAnalyzingByUser[selectedUserId]
   const analysisError = analysisErrors[selectedUserId]
   const messageText = drafts[selectedUserId]
+  const conversationSignature = useMemo(
+    () => createConversationSignature(messages),
+    [messages],
+  )
+  const lastConversationSignature = useRef<string | null>(null)
+  const clearAllAnalysisRef = useRef(clearAllAnalysis)
+
+  useEffect(() => {
+    clearAllAnalysisRef.current = clearAllAnalysis
+  }, [clearAllAnalysis])
+
+  useEffect(() => {
+    if (areMessagesLoading || isSending) {
+      return
+    }
+
+    if (lastConversationSignature.current === null) {
+      lastConversationSignature.current = conversationSignature
+      return
+    }
+
+    if (lastConversationSignature.current !== conversationSignature) {
+      lastConversationSignature.current = conversationSignature
+      clearAllAnalysisRef.current()
+    }
+  }, [areMessagesLoading, conversationSignature, isSending])
 
   function setSelectedDraft(text: string) {
     setDrafts((currentDrafts) => ({

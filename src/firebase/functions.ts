@@ -62,7 +62,7 @@ export async function analyzeConversation(
   return validateAiAnalysisResult(result.data)
 }
 
-function validateAiAnalysisResult(data: unknown): AiAnalysisResult {
+export function validateAiAnalysisResult(data: unknown): AiAnalysisResult {
   if (
     typeof data !== 'object' ||
     data === null ||

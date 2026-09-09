@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 AGENTS.md
-docs/PROJECT_SPEC.md
+docs/*
+!docs/PHASE3_TEST_CASES.md
 
 .agents/skills
