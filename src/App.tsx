@@ -140,7 +140,6 @@ function App() {
     <main className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Academic Phase 2 PoC</p>
           <h1>AI-Assisted Chat</h1>
         </div>
         <div className="header-meta">
