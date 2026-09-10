@@ -28,3 +28,4 @@ docs/*
 !docs/PHASE3_TEST_CASES.md
 
 .agents/skills
+.firebase
