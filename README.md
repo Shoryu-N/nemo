@@ -17,12 +17,16 @@ This project is **not a production-ready messaging platform**. It was implemente
 - Message validation with a 1000-character limit
 - Firestore Security Rules for authenticated, fixed-room access
 - Callable Cloud Function for AI conversation analysis
+- Selectable conversation context strategy:
+  - Baseline — latest 20 messages
+  - Method A — BM25 lexical relevance selection
 - AI output containing:
   - `summary`
   - `importantInformation`
   - `suggestedReply`
 - Separate AI-analysis state for Alice and Bob
 - Stale AI-analysis invalidation when the conversation changes
+- Latest 100 chat messages displayed in chronological order
 - Editable Use Reply workflow
 - Explicit user-controlled Send action
 - Firebase deployment support
@@ -56,7 +60,7 @@ Cloud Firestore
 React frontend
         |
         | callable function:
-        | analyzeConversation({ replyAs })
+        | analyzeConversation({ replyAs, strategy })
         v
 Cloud Functions for Firebase v2
         |
@@ -72,13 +76,35 @@ Only the backend Cloud Function calls OpenAI. The OpenAI API key is never placed
 1. The user signs in anonymously.
 2. The user sends and receives text messages in the fixed `main` room.
 3. The user explicitly clicks Analyze Conversation.
-4. The callable function retrieves recent valid messages and requests structured AI output.
-5. The frontend displays the summary, important information, and suggested reply.
-6. The user may click Use Reply to insert the suggestion into the editable draft.
-7. The user can edit the draft.
-8. The message is sent only when the user explicitly clicks Send.
+4. The callable function retrieves a bounded valid-message history and applies
+   the selected Baseline or BM25 context strategy.
+5. At most 20 selected messages are restored to chronological order and sent to
+   OpenAI for structured analysis.
+6. The frontend displays the summary, important information, and suggested reply.
+7. The user may click Use Reply to insert the suggestion into the editable draft.
+8. The user can edit the draft.
+9. The message is sent only when the user explicitly clicks Send.
 
 AI-generated replies are never sent automatically.
+
+## Capstone Context Selection
+
+The original Study Project behavior remains available as the Baseline strategy:
+the backend retrieves and sends the latest 20 valid messages without BM25
+processing.
+
+Method A retrieves a bounded candidate history of up to 100 messages. It builds
+a lexical query from the latest three messages, reserves those messages as
+anchors, and uses BM25 to rank older candidates. Selection is limited to 20
+messages and an approximate character-based token budget comparable to the
+Baseline window. The selected set is restored to chronological order before AI
+analysis.
+
+BM25 is lexical retrieval, not semantic similarity. It may retrieve older facts
+that share query wording, but it may miss synonyms or globally important facts
+unrelated to the current topic. Any improvement in final AI output remains a
+hypothesis requiring evaluation. Detailed design and evaluation requirements
+are in `docs/CAPSTONE_SPEC.md`.
 
 ## Project Structure
 
@@ -189,8 +215,46 @@ The default emulator ports are configured in `firebase.json`:
 Start the local emulators:
 
 ```bash
-firebase emulators:start
+firebase emulators:start --project nemo-chat-app-645d
 ```
+
+The emulator project ID must match `VITE_FIREBASE_PROJECT_ID` in `.env.local`.
+Using a different project ID causes the frontend and callable/Firestore emulator
+namespaces to diverge.
+
+### Seed the BM25 Projector Calibration fixture
+
+With the emulators running, seed the deterministic 24-message fictional
+conversation from another terminal:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed:bm25
+```
+
+The command is deliberately restricted to a loopback Firestore Emulator. It
+also verifies the running emulator project against `VITE_FIREBASE_PROJECT_ID`
+and refuses to run when production service-account credentials are configured.
+It never reads or prints an API key.
+
+The fixture is written to `rooms/main/messages` with deterministic document
+IDs, alternating Alice/Bob identities, and one-minute timestamps beginning at
+`2026-01-01T00:00:00Z`. A successful first run reports 24 created messages. A
+repeat run reports 0 created and 0 updated, without creating duplicates.
+
+If unrelated messages or modified fixture documents already exist in the room,
+the command stops without changing data. To reset the local fictional
+conversation safely, stop the Emulator Suite and restart it without an import
+or exported-data option, then run the seed command again. This clears the
+ephemeral local emulator state; do not delete or overwrite unrelated documents
+with the seed utility.
+
+Verify the fixture in the Emulator UI at `http://127.0.0.1:4000`, or start the
+application with `npm run dev` and confirm that 24 messages appear in
+chronological order. For a repeatable Baseline-versus-BM25 experiment, avoid
+sending additional messages after seeding. Baseline uses messages 5-24 and
+therefore excludes the blue-folder fact in message 2; Method A should retrieve
+that fact from the larger candidate history while retaining messages 22-24 as
+anchors.
 
 Run emulator-backed test suites:
 
@@ -290,7 +354,7 @@ firebase deploy --only functions --project <YOUR_FIREBASE_PROJECT_ID>
 firebase deploy --only hosting --project <YOUR_FIREBASE_PROJECT_ID>
 ```
 
-## Validation Results
+## Study Project Baseline Validation Results
 
 Phase 3 validation produced the following recorded results:
 
@@ -317,6 +381,34 @@ During Firestore Security Rules testing, messages containing only U+3000 full-wi
 
 These measurements are small-scale proof-of-concept observations and should not be interpreted as production-scale performance or load-testing evidence.
 
+## Capstone Iteration 1 Automated Validation
+
+The following checks cover the current Baseline/BM25 implementation:
+
+| Category | Result |
+| --- | --- |
+| Frontend Unit Tests | 16 passed, 0 failed |
+| Functions Unit Tests | 47 passed, 0 failed |
+| Firestore Security Rules Tests | 26 passed, 0 failed |
+| Firebase Integration Tests | 8 passed, 0 failed |
+| Automated Total | 97 passed, 0 failed |
+| Frontend TypeScript/Vite Build | Pass |
+| Functions TypeScript Build | Pass |
+| Frontend and Functions Lint | Pass |
+
+The Functions tests include deterministic fictional positive and lexical-mismatch
+fixtures. To inspect the fixture-only candidate IDs, BM25 scores, selected IDs,
+chronological output, and fallback assertions, run:
+
+```bash
+SHOW_CONTEXT_DIAGNOSTICS=true npm --prefix functions test -- \
+  --run test/contextSelection/diagnostics.test.ts --disableConsoleIntercept
+```
+
+These diagnostics are not returned by the production callable and production
+logs contain only aggregate counts, timings, approximate token estimates, and
+fallback categories.
+
 ## Current Limitations
 
 - Academic proof of concept, not production-ready
@@ -329,6 +421,10 @@ These measurements are small-scale proof-of-concept observations and should not 
 - No message editing or deletion workflow
 - No offline support
 - AI analysis uses limited recent conversation context
+- BM25 selection is lexical and can miss paraphrases or synonyms
+- The BM25 candidate history is bounded to the latest 100 messages
+- Context token counts used during selection are character-based estimates, not
+  exact OpenAI token counts
 - Live AI evaluation used a small fictional scenario set
 - AI output can vary between runs
 - Performance validation was small-scale and was not production load testing

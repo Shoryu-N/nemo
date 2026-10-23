@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
 import { analyzeConversation } from '../firebase/functions'
-import type { AiAnalysisResult, DisplayUserId } from '../types/chat'
+import type {
+  AiAnalysisResult,
+  ContextSelectionStrategy,
+  DisplayUserId,
+} from '../types/chat'
 
 type AiAnalysisByUser = Record<DisplayUserId, AiAnalysisResult | null>
 type AiErrorByUser = Record<DisplayUserId, string | null>
@@ -10,7 +14,10 @@ type AiAnalysisState = {
   analyses: AiAnalysisByUser
   isAnalyzingByUser: AiLoadingByUser
   errors: AiErrorByUser
-  requestAnalysis: (replyAs: DisplayUserId) => Promise<void>
+  requestAnalysis: (
+    replyAs: DisplayUserId,
+    strategy: ContextSelectionStrategy,
+  ) => Promise<void>
   clearAllAnalysis: () => void
 }
 
@@ -51,7 +58,10 @@ export function useAiAnalysis(): AiAnalysisState {
     )
   }, [])
 
-  async function requestAnalysis(replyAs: DisplayUserId) {
+  async function requestAnalysis(
+    replyAs: DisplayUserId,
+    strategy: ContextSelectionStrategy,
+  ) {
     if (isAnalyzingByUser[replyAs]) {
       return
     }
@@ -72,7 +82,7 @@ export function useAiAnalysis(): AiAnalysisState {
     }))
 
     try {
-      const result = await analyzeConversation({ replyAs })
+      const result = await analyzeConversation({ replyAs, strategy })
       if (analysisVersion.current === requestVersion) {
         setAnalyses((currentAnalyses) => ({
           ...currentAnalyses,

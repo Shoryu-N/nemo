@@ -1,9 +1,16 @@
-import type { AiAnalysisResult } from '../types/chat'
+import { ContextStrategySelector } from './ContextStrategySelector'
+import type {
+  AiAnalysisResult,
+  ContextSelectionStrategy,
+} from '../types/chat'
 
 type AiPanelProps = {
   analysis: AiAnalysisResult | null
   isAnalyzing: boolean
   error: string | null
+  strategy: ContextSelectionStrategy
+  isStrategyDisabled: boolean
+  onStrategyChange: (strategy: ContextSelectionStrategy) => void
   onAnalyze: () => void
   onUseReply: () => void
 }
@@ -12,6 +19,9 @@ export function AiPanel({
   analysis,
   isAnalyzing,
   error,
+  strategy,
+  isStrategyDisabled,
+  onStrategyChange,
   onAnalyze,
   onUseReply,
 }: AiPanelProps) {
@@ -28,6 +38,12 @@ export function AiPanel({
           {isAnalyzing ? 'Analyzing...' : 'Analyze Conversation'}
         </button>
       </div>
+
+      <ContextStrategySelector
+        value={strategy}
+        disabled={isStrategyDisabled}
+        onChange={onStrategyChange}
+      />
 
       {error && <p className="state-message error-message">{error}</p>}
       {isAnalyzing && (

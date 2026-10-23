@@ -189,9 +189,43 @@ describe('Firebase emulator integration', () => {
     ])
   })
 
+  it('INT-003A exposes the latest 100 messages in chronological order', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await Promise.all(Array.from({ length: 105 }, (_, index) => setDoc(
+        doc(
+          context.firestore(),
+          'rooms',
+          'main',
+          'messages',
+          `message-${String(index + 1).padStart(3, '0')}`,
+        ),
+        {
+          senderId: 'alice',
+          senderName: 'Alice',
+          text: `Message ${index + 1}.`,
+          createdAt: Timestamp.fromMillis(index + 1),
+        },
+      )))
+    })
+    await signInAnonymously()
+
+    const messages = await waitForMessages((nextMessages) => (
+      nextMessages.length === 100 &&
+      nextMessages[0]?.text === 'Message 6.' &&
+      nextMessages[99]?.text === 'Message 105.'
+    ))
+
+    expect(messages).toHaveLength(100)
+    expect(messages[0].text).toBe('Message 6.')
+    expect(messages[99].text).toBe('Message 105.')
+  })
+
   it('INT-004 rejects unauthenticated analyzeConversation calls', async () => {
     await expect(
-      functionsModule.analyzeConversation({ replyAs: 'alice' }),
+      functionsModule.analyzeConversation({
+        replyAs: 'alice',
+        strategy: 'baseline',
+      }),
     ).rejects.toMatchObject({
       code: 'functions/unauthenticated',
     })
@@ -203,6 +237,7 @@ describe('Firebase emulator integration', () => {
     await expect(
       functionsModule.analyzeConversation({
         replyAs: 'charlie',
+        strategy: 'baseline',
       } as Parameters<typeof functionsModule.analyzeConversation>[0]),
     ).rejects.toMatchObject({
       code: 'functions/invalid-argument',
@@ -211,24 +246,46 @@ describe('Firebase emulator integration', () => {
     await expect(
       functionsModule.analyzeConversation({
         replyAs: 'alice',
+        strategy: 'baseline',
         roomId: 'main',
+      } as Parameters<typeof functionsModule.analyzeConversation>[0]),
+    ).rejects.toMatchObject({
+      code: 'functions/invalid-argument',
+    })
+
+    await expect(
+      functionsModule.analyzeConversation({
+        replyAs: 'alice',
+        strategy: 'bm25_recency',
+      } as Parameters<typeof functionsModule.analyzeConversation>[0]),
+    ).rejects.toMatchObject({
+      code: 'functions/invalid-argument',
+    })
+
+    await expect(
+      functionsModule.analyzeConversation({
+        replyAs: 'alice',
       } as Parameters<typeof functionsModule.analyzeConversation>[0]),
     ).rejects.toMatchObject({
       code: 'functions/invalid-argument',
     })
   })
 
-  it('INT-006 returns structured empty-conversation analysis without OpenAI', async () => {
-    await signInAnonymously()
+  it.each(['baseline', 'bm25'] as const)(
+    'INT-006 returns empty-conversation analysis for %s without OpenAI',
+    async (strategy) => {
+      await signInAnonymously()
 
-    const result = await functionsModule.analyzeConversation({
-      replyAs: 'bob',
-    })
+      const result = await functionsModule.analyzeConversation({
+        replyAs: 'bob',
+        strategy,
+      })
 
-    expect(result).toEqual({
-      summary: 'No conversation to summarize.',
-      importantInformation: [],
-      suggestedReply: '',
-    })
-  })
+      expect(result).toEqual({
+        summary: 'No conversation to summarize.',
+        importantInformation: [],
+        suggestedReply: '',
+      })
+    },
+  )
 })

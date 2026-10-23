@@ -5,7 +5,11 @@ import {
   type Functions,
 } from 'firebase/functions'
 import { getFirebaseApp } from './app'
-import type { AiAnalysisResult, DisplayUserId } from '../types/chat'
+import type {
+  AiAnalysisResult,
+  ContextSelectionStrategy,
+  DisplayUserId,
+} from '../types/chat'
 
 type FunctionsEnv = {
   VITE_USE_FIREBASE_FUNCTIONS_EMULATOR?: string
@@ -16,6 +20,7 @@ type FunctionsEnv = {
 
 type AnalyzeConversationInput = {
   replyAs: DisplayUserId
+  strategy: ContextSelectionStrategy
 }
 
 declare global {

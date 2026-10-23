@@ -26,6 +26,8 @@ dist-ssr
 AGENTS.md
 docs/*
 !docs/PHASE3_TEST_CASES.md
+!docs/CAPSTONE_SPEC.md
 
 .agents/skills
 .firebase
+.firebase-config/

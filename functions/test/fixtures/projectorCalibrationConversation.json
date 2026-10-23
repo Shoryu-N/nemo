@@ -1,0 +1,98 @@
+[
+  {
+    "id": "opening",
+    "text": "Welcome to the project discussion."
+  },
+  {
+    "id": "older-projector-location",
+    "text": "The projector calibration checklist is stored in the blue folder."
+  },
+  {
+    "id": "neutral-01",
+    "text": "Routine planning note number 1."
+  },
+  {
+    "id": "neutral-02",
+    "text": "Routine planning note number 2."
+  },
+  {
+    "id": "neutral-03",
+    "text": "Routine planning note number 3."
+  },
+  {
+    "id": "neutral-04",
+    "text": "Routine planning note number 4."
+  },
+  {
+    "id": "neutral-05",
+    "text": "Routine planning note number 5."
+  },
+  {
+    "id": "neutral-06",
+    "text": "Routine planning note number 6."
+  },
+  {
+    "id": "neutral-07",
+    "text": "Routine planning note number 7."
+  },
+  {
+    "id": "neutral-08",
+    "text": "Routine planning note number 8."
+  },
+  {
+    "id": "neutral-09",
+    "text": "Routine planning note number 9."
+  },
+  {
+    "id": "neutral-10",
+    "text": "Routine planning note number 10."
+  },
+  {
+    "id": "neutral-11",
+    "text": "Routine planning note number 11."
+  },
+  {
+    "id": "neutral-12",
+    "text": "Routine planning note number 12."
+  },
+  {
+    "id": "neutral-13",
+    "text": "Routine planning note number 13."
+  },
+  {
+    "id": "neutral-14",
+    "text": "Routine planning note number 14."
+  },
+  {
+    "id": "neutral-15",
+    "text": "Routine planning note number 15."
+  },
+  {
+    "id": "neutral-16",
+    "text": "Routine planning note number 16."
+  },
+  {
+    "id": "neutral-17",
+    "text": "Routine planning note number 17."
+  },
+  {
+    "id": "neutral-18",
+    "text": "Routine planning note number 18."
+  },
+  {
+    "id": "neutral-19",
+    "text": "Routine planning note number 19."
+  },
+  {
+    "id": "anchor-projector",
+    "text": "We need to finish the projector calibration before the demo."
+  },
+  {
+    "id": "anchor-checklist",
+    "text": "Can you check the calibration checklist location?"
+  },
+  {
+    "id": "anchor-location",
+    "text": "Where is the projector checklist stored?"
+  }
+]

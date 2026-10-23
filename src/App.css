@@ -185,6 +185,19 @@
   top: 24px;
 }
 
+.strategy-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.strategy-selector select {
+  width: 100%;
+}
+
 .ai-section {
   border-top: 1px solid var(--border);
   padding-top: 16px;
