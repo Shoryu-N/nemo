@@ -5,8 +5,10 @@ import type {
   ConversationMessage,
   DisplayUserId,
 } from "./types";
+import type {ContextSelectionStrategy} from "./contextSelection/types";
 
 const displayUserIds = ["alice", "bob"];
+const contextSelectionStrategies = ["baseline", "bm25"];
 
 /**
  * Validates the callable request payload for analyzeConversation.
@@ -20,10 +22,15 @@ export function validateAnalyzeConversationInput(
 
   const keys = Object.keys(data);
 
-  if (keys.length !== 1 || !keys.includes("replyAs")) {
+  const expectedKeys = ["replyAs", "strategy"];
+
+  if (
+    keys.length !== expectedKeys.length ||
+    !expectedKeys.every((key) => keys.includes(key))
+  ) {
     throw new HttpsError(
       "invalid-argument",
-      "Request data must contain only replyAs.",
+      "Request data must contain only replyAs and strategy.",
     );
   }
 
@@ -34,7 +41,14 @@ export function validateAnalyzeConversationInput(
     );
   }
 
-  return {replyAs: data.replyAs};
+  if (!isContextSelectionStrategy(data.strategy)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "strategy must be either baseline or bm25.",
+    );
+  }
+
+  return {replyAs: data.replyAs, strategy: data.strategy};
 }
 
 /**
@@ -98,6 +112,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function isDisplayUserId(value: unknown): value is DisplayUserId {
   return displayUserIds.includes(String(value));
+}
+
+/**
+ * Checks for one of the enabled context-selection strategies.
+ */
+function isContextSelectionStrategy(
+  value: unknown,
+): value is ContextSelectionStrategy {
+  return contextSelectionStrategies.includes(String(value));
 }
 
 /**

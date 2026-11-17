@@ -12,21 +12,43 @@ const validAiResult = {
 };
 
 describe("validateAnalyzeConversationInput", () => {
-  it("accepts alice as replyAs", () => {
-    expect(validateAnalyzeConversationInput({replyAs: "alice"})).toEqual({
+  it("accepts alice with the Baseline strategy", () => {
+    expect(validateAnalyzeConversationInput({
       replyAs: "alice",
+      strategy: "baseline",
+    })).toEqual({
+      replyAs: "alice",
+      strategy: "baseline",
     });
   });
 
-  it("accepts bob as replyAs", () => {
-    expect(validateAnalyzeConversationInput({replyAs: "bob"})).toEqual({
+  it("accepts bob with the BM25 strategy", () => {
+    expect(validateAnalyzeConversationInput({
       replyAs: "bob",
+      strategy: "bm25",
+    })).toEqual({
+      replyAs: "bob",
+      strategy: "bm25",
     });
   });
 
   it("rejects a missing replyAs", () => {
+    expect(() => validateAnalyzeConversationInput({strategy: "baseline"}))
+      .toThrow(
+        "Request data must contain only replyAs and strategy.",
+      );
+  });
+
+  it("rejects a missing strategy", () => {
+    expect(() => validateAnalyzeConversationInput({replyAs: "alice"}))
+      .toThrow(
+        "Request data must contain only replyAs and strategy.",
+      );
+  });
+
+  it("rejects an empty object", () => {
     expect(() => validateAnalyzeConversationInput({})).toThrow(
-      "Request data must contain only replyAs.",
+      "Request data must contain only replyAs and strategy.",
     );
   });
 
@@ -43,20 +65,41 @@ describe("validateAnalyzeConversationInput", () => {
   });
 
   it("rejects an invalid identity", () => {
-    expect(() => validateAnalyzeConversationInput({replyAs: "charlie"}))
+    expect(() => validateAnalyzeConversationInput({
+      replyAs: "charlie",
+      strategy: "baseline",
+    }))
       .toThrow("replyAs must be either alice or bob.");
   });
 
   it("rejects uppercase identities", () => {
-    expect(() => validateAnalyzeConversationInput({replyAs: "Alice"}))
+    expect(() => validateAnalyzeConversationInput({
+      replyAs: "Alice",
+      strategy: "baseline",
+    }))
       .toThrow("replyAs must be either alice or bob.");
+  });
+
+  it("rejects an invalid strategy", () => {
+    expect(() => validateAnalyzeConversationInput({
+      replyAs: "alice",
+      strategy: "semantic",
+    })).toThrow("strategy must be either baseline or bm25.");
+  });
+
+  it("rejects future strategies that are not enabled", () => {
+    expect(() => validateAnalyzeConversationInput({
+      replyAs: "alice",
+      strategy: "bm25_recency",
+    })).toThrow("strategy must be either baseline or bm25.");
   });
 
   it("rejects unexpected extra fields", () => {
     expect(() => validateAnalyzeConversationInput({
       replyAs: "alice",
+      strategy: "baseline",
       roomId: "main",
-    })).toThrow("Request data must contain only replyAs.");
+    })).toThrow("Request data must contain only replyAs and strategy.");
   });
 });
 

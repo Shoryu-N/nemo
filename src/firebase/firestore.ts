@@ -99,14 +99,14 @@ export function subscribeToMainRoomMessages(
 ): Unsubscribe {
   const messagesQuery = query(
     getMainRoomMessagesCollection(),
-    orderBy('createdAt', 'asc'),
+    orderBy('createdAt', 'desc'),
     limit(100),
   )
 
   return onSnapshot(
     messagesQuery,
     (snapshot) => {
-      onMessages(snapshot.docs.map(toChatMessage))
+      onMessages([...snapshot.docs].reverse().map(toChatMessage))
     },
     (unknownError) => {
       const message =

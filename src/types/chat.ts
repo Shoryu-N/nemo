@@ -1,5 +1,7 @@
 export type DisplayUserId = 'alice' | 'bob'
 
+export type ContextSelectionStrategy = 'baseline' | 'bm25'
+
 export type DisplayUser = {
   id: DisplayUserId
   name: 'Alice' | 'Bob'

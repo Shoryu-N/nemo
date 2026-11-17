@@ -1,22 +1,20 @@
 import {initializeApp} from "firebase-admin/app";
-import {getFirestore} from "firebase-admin/firestore";
-import {setGlobalOptions} from "firebase-functions";
+import {logger, setGlobalOptions} from "firebase-functions";
 import {defineSecret} from "firebase-functions/params";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {performance} from "node:perf_hooks";
 import {createOpenAiProvider} from "./ai/openaiProvider";
 import {createAiProvider} from "./ai/provider";
+import {getContextCandidates} from "./conversationRepository";
+import {selectConversationContext} from "./contextSelection/selector";
 import {
-  isValidConversationMessage,
   validateAiAnalysisResult,
   validateAnalyzeConversationInput,
 } from "./validation";
-import type {ConversationMessage} from "./types";
 
 initializeApp();
 setGlobalOptions({maxInstances: 10});
 
-const fixedRoomId = "main";
-const maxAnalysisMessages = 20;
 const openAiApiKey = defineSecret("OPENAI_API_KEY");
 
 export const analyzeConversation = onCall({
@@ -29,10 +27,25 @@ export const analyzeConversation = onCall({
     );
   }
 
-  const {replyAs} = validateAnalyzeConversationInput(request.data);
-  const messages = await getLatestMessagesForAnalysis();
+  const {replyAs, strategy} = validateAnalyzeConversationInput(request.data);
+  const {candidates, retrievedDocumentCount} =
+    await getContextCandidates(strategy);
+  const selectionStartedAt = performance.now();
+  const selection = selectConversationContext(candidates, strategy);
+  const selectionDurationMs = performance.now() - selectionStartedAt;
 
-  if (messages.length === 0) {
+  logger.info("Conversation context selected.", {
+    strategy,
+    retrievedDocumentCount,
+    candidateMessageCount: candidates.length,
+    selectedMessageCount: selection.selectedMessages.length,
+    selectionDurationMs,
+    estimatedContextTokens: selection.estimatedContextTokens,
+    estimatedBaselineTokens: selection.estimatedBaselineTokens,
+    fallback: selection.diagnostics.fallback,
+  });
+
+  if (selection.selectedMessages.length === 0) {
     return {
       summary: "No conversation to summarize.",
       importantInformation: [],
@@ -53,33 +66,17 @@ export const analyzeConversation = onCall({
   let providerResult;
 
   try {
-    providerResult = await aiProvider.analyzeConversation(messages, replyAs);
+    providerResult = await aiProvider.analyzeConversation(
+      selection.selectedMessages.map(({senderId, senderName, text}) => ({
+        senderId,
+        senderName,
+        text,
+      })),
+      replyAs,
+    );
   } catch {
     throw new HttpsError("internal", "Conversation analysis failed.");
   }
 
   return validateAiAnalysisResult(providerResult);
 });
-
-/**
- * Reads the latest messages from the fixed prototype room for AI analysis.
- */
-async function getLatestMessagesForAnalysis(): Promise<ConversationMessage[]> {
-  const snapshot = await getFirestore()
-    .collection("rooms")
-    .doc(fixedRoomId)
-    .collection("messages")
-    .orderBy("createdAt", "desc")
-    .limit(maxAnalysisMessages)
-    .get();
-
-  return snapshot.docs
-    .reverse()
-    .map((documentSnapshot) => documentSnapshot.data())
-    .filter(isValidConversationMessage)
-    .map((data) => ({
-      senderId: data.senderId,
-      senderName: data.senderName,
-      text: data.text,
-    }));
-}

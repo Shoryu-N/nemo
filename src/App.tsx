@@ -9,6 +9,7 @@ import { useMessages } from './hooks/useMessages'
 import {
   isValidMessageText,
   normalizeMessageText,
+  type ContextSelectionStrategy,
   type DisplayUser,
   type DisplayUserId,
 } from './types/chat'
@@ -53,12 +54,15 @@ function App() {
   } = useAiAnalysis()
   const [selectedUserId, setSelectedUserId] =
     useState<DisplayUserId>('alice')
+  const [selectedStrategy, setSelectedStrategy] =
+    useState<ContextSelectionStrategy>('baseline')
   const [drafts, setDrafts] =
     useState<Record<DisplayUserId, string>>(initialDrafts)
 
   const selectedUser = displayUsers.find((user) => user.id === selectedUserId)
   const currentAnalysis = analyses[selectedUserId]
   const isAnalyzing = isAnalyzingByUser[selectedUserId]
+  const isAnyAnalysisRunning = Object.values(isAnalyzingByUser).some(Boolean)
   const analysisError = analysisErrors[selectedUserId]
   const messageText = drafts[selectedUserId]
   const conversationSignature = useMemo(
@@ -177,7 +181,17 @@ function App() {
           analysis={currentAnalysis}
           isAnalyzing={isAnalyzing}
           error={analysisError}
-          onAnalyze={() => void requestAnalysis(selectedUserId)}
+          strategy={selectedStrategy}
+          isStrategyDisabled={isAnyAnalysisRunning}
+          onStrategyChange={(strategy) => {
+            if (strategy !== selectedStrategy) {
+              setSelectedStrategy(strategy)
+              clearAllAnalysis()
+            }
+          }}
+          onAnalyze={() => {
+            void requestAnalysis(selectedUserId, selectedStrategy)
+          }}
           onUseReply={() => {
             if (currentAnalysis?.suggestedReply) {
               setSelectedDraft(currentAnalysis.suggestedReply)

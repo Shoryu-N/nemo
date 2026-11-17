@@ -1,7 +1,10 @@
+import type {ContextSelectionStrategy} from "./contextSelection/types";
+
 export type DisplayUserId = "alice" | "bob";
 
 export type AnalyzeConversationInput = {
   replyAs: DisplayUserId;
+  strategy: ContextSelectionStrategy;
 };
 
 export type ConversationMessage = {
