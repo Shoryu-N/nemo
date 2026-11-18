@@ -1,4 +1,4 @@
-import {FieldPath, getFirestore} from "firebase-admin/firestore";
+import {FieldPath, Timestamp, getFirestore} from "firebase-admin/firestore";
 import {
   baselineMessageLimit,
   bm25CandidateLimit,
@@ -35,7 +35,8 @@ export async function getContextCandidates(
   const validDocuments = [...snapshot.docs]
     .reverse()
     .filter((documentSnapshot) => (
-      isValidConversationMessage(documentSnapshot.data())
+      isValidConversationMessage(documentSnapshot.data()) &&
+      documentSnapshot.data().createdAt instanceof Timestamp
     ));
 
   return {
@@ -45,6 +46,7 @@ export async function getContextCandidates(
       return {
         id: documentSnapshot.id,
         chronologicalIndex: index,
+        createdAtMillis: (data.createdAt as Timestamp).toMillis(),
         senderId: data.senderId,
         senderName: data.senderName,
         text: data.text,

@@ -12,6 +12,7 @@ const strategyOptions: Array<{
 }> = [
   { value: 'baseline', label: 'Baseline — Latest 20 Messages' },
   { value: 'bm25', label: 'Method A — BM25' },
+  { value: 'bm25_recency', label: 'Method B — BM25 + Recency' },
 ]
 
 export function ContextStrategySelector({

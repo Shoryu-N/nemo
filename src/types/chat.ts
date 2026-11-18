@@ -1,6 +1,6 @@
 export type DisplayUserId = 'alice' | 'bob'
 
-export type ContextSelectionStrategy = 'baseline' | 'bm25'
+export type ContextSelectionStrategy = 'baseline' | 'bm25' | 'bm25_recency'
 
 export type DisplayUser = {
   id: DisplayUserId

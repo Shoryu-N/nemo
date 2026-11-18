@@ -1,10 +1,14 @@
 import type {ConversationMessage} from "../types";
 
-export type ContextSelectionStrategy = "baseline" | "bm25";
+export type ContextSelectionStrategy =
+  | "baseline"
+  | "bm25"
+  | "bm25_recency";
 
 export type ContextCandidate = ConversationMessage & {
   id: string;
   chronologicalIndex: number;
+  createdAtMillis: number;
 };
 
 export type ContextSelectionFallback =
@@ -17,6 +21,13 @@ export type ContextSelectionFallback =
 export type ScoredContextCandidate = {
   messageId: string;
   score: number;
+  bm25Score?: number;
+  normalizedBm25Score?: number;
+  ageDays?: number;
+  recencyScore?: number;
+  combinedScore?: number;
+  rankingPosition?: number;
+  includedInFinalContext?: boolean;
 };
 
 /**

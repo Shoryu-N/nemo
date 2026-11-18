@@ -3,6 +3,12 @@ import {
   toScoredDiagnostics,
   tokenize,
 } from "./bm25";
+import {
+  defaultRecencyParameters,
+  rankCandidatesByBm25Recency,
+  toRecencyDiagnostics,
+  type RecencyParameters,
+} from "./recency";
 import type {
   ContextCandidate,
   ContextSelectionFallback,
@@ -15,12 +21,17 @@ export const bm25CandidateLimit = 100;
 export const queryMessageCount = 3;
 export const estimatedCharactersPerToken = 4;
 
+export type ContextSelectionOptions = {
+  recencyParameters?: RecencyParameters;
+};
+
 /**
  * Selects bounded conversation context without provider-specific behavior.
  */
 export function selectConversationContext(
   candidates: ContextCandidate[],
   strategy: ContextSelectionStrategy,
+  options: ContextSelectionOptions = {},
 ): ContextSelectionResult {
   const chronologicalCandidates = [...candidates].sort(compareChronologically);
 
@@ -28,7 +39,11 @@ export function selectConversationContext(
     return selectBaselineContext(chronologicalCandidates);
   }
 
-  return selectBm25Context(chronologicalCandidates);
+  return selectBm25Context(
+    chronologicalCandidates,
+    strategy,
+    options.recencyParameters ?? defaultRecencyParameters,
+  );
 }
 
 /**
@@ -73,6 +88,8 @@ function selectBaselineContext(
 
 function selectBm25Context(
   chronologicalCandidates: ContextCandidate[],
+  strategy: "bm25" | "bm25_recency",
+  recencyParameters: RecencyParameters,
 ): ContextSelectionResult {
   const baselineMessages = chronologicalCandidates.slice(-baselineMessageLimit);
   const estimatedBaselineTokens = estimateContextTokens(baselineMessages);
@@ -99,11 +116,26 @@ function selectBm25Context(
     );
   }
 
-  const rankedCandidates = rankCandidatesByBm25(
+  const isRecencyStrategy = strategy === "bm25_recency";
+  const bm25RankedCandidates = isRecencyStrategy ? [] : rankCandidatesByBm25(
     olderCandidates,
     queryTerms,
   );
-  const positiveCandidates = rankedCandidates.filter(({score}) => score > 0);
+  const recencyRankedCandidates = isRecencyStrategy ?
+    rankCandidatesByBm25Recency(
+      olderCandidates,
+      queryTerms,
+      chronologicalCandidates[chronologicalCandidates.length - 1]
+        ?.createdAtMillis ?? Number.NaN,
+      recencyParameters,
+    ) : [];
+  const positiveCandidates = isRecencyStrategy ?
+    recencyRankedCandidates
+      .filter(({bm25Score}) => bm25Score > 0)
+      .map(({candidate}) => candidate) :
+    bm25RankedCandidates
+      .filter(({score}) => score > 0)
+      .map(({candidate}) => candidate);
 
   if (positiveCandidates.length === 0) {
     return buildFallbackResult(
@@ -111,7 +143,12 @@ function selectBm25Context(
       baselineMessages,
       estimatedBaselineTokens,
       "no_positive_match",
-      toScoredDiagnostics(rankedCandidates),
+      isRecencyStrategy ?
+        toRecencyDiagnostics(
+          recencyRankedCandidates,
+          new Set(baselineMessages.map(({id}) => id)),
+        ) :
+        toScoredDiagnostics(bm25RankedCandidates),
     );
   }
 
@@ -123,7 +160,7 @@ function selectBm25Context(
     estimatedBaselineTokens - estimateContextTokens(anchors),
   );
 
-  for (const {candidate} of positiveCandidates) {
+  for (const candidate of positiveCandidates) {
     if (selectedInSelectionOrder.length >= baselineMessageLimit) {
       break;
     }
@@ -172,7 +209,9 @@ function selectBm25Context(
     estimatedBaselineTokens,
     diagnostics: {
       candidateMessageIds: chronologicalCandidates.map(({id}) => id),
-      rankedCandidates: toScoredDiagnostics(rankedCandidates),
+      rankedCandidates: isRecencyStrategy ?
+        toRecencyDiagnostics(recencyRankedCandidates, selectedIds) :
+        toScoredDiagnostics(bm25RankedCandidates),
       selectedMessageIds: selectedInSelectionOrder.map(({id}) => id),
       finalChronologicalMessageIds: selectedMessages.map(({id}) => id),
       skippedForBudgetMessageIds,

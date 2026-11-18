@@ -7,6 +7,7 @@ import type {ContextCandidate} from "../../src/contextSelection/types";
 import {
   lexicalMatchFixture,
   lexicalMismatchFixture,
+  recencyComparisonFixture,
 } from "../fixtures/contextSelectionFixtures";
 
 function message(
@@ -17,6 +18,7 @@ function message(
   return {
     id,
     chronologicalIndex,
+    createdAtMillis: Date.UTC(2026, 0, 1 + chronologicalIndex),
     senderId: "alice",
     senderName: "Alice",
     text,
@@ -79,23 +81,29 @@ describe("context strategy selector", () => {
       .not.toContain("older-automobile-detail");
   });
 
-  it("returns an empty selection for empty history", () => {
-    const result = selectConversationContext([], "bm25");
+  it.each(["bm25", "bm25_recency"] as const)(
+    "returns an empty selection for empty history with %s",
+    (strategy) => {
+      const result = selectConversationContext([], strategy);
 
-    expect(result.selectedMessages).toEqual([]);
-    expect(result.diagnostics.fallback).toBe("short_history");
-  });
+      expect(result.selectedMessages).toEqual([]);
+      expect(result.diagnostics.fallback).toBe("short_history");
+    },
+  );
 
-  it("keeps every message in a small candidate set", () => {
-    const candidates = [
-      message("first", 0, "First message."),
-      message("second", 1, "Second message."),
-    ];
-    const result = selectConversationContext(candidates, "bm25");
+  it.each(["bm25", "bm25_recency"] as const)(
+    "keeps every message in a small candidate set with %s",
+    (strategy) => {
+      const candidates = [
+        message("first", 0, "First message."),
+        message("second", 1, "Second message."),
+      ];
+      const result = selectConversationContext(candidates, strategy);
 
-    expect(result.selectedMessages).toEqual(candidates);
-    expect(result.diagnostics.fallback).toBe("short_history");
-  });
+      expect(result.selectedMessages).toEqual(candidates);
+      expect(result.diagnostics.fallback).toBe("short_history");
+    },
+  );
 
   it("falls back to latest 20 for an empty lexical query", () => {
     const candidates = Array.from({length: 24}, (_, index) => message(
@@ -148,5 +156,79 @@ describe("context strategy selector", () => {
     );
     expect(result.estimatedContextTokens)
       .toBeLessThanOrEqual(result.estimatedBaselineTokens);
+  });
+
+  it("lets Method B prefer a newer comparable relevant revision", () => {
+    const methodA = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25",
+    );
+    const methodB = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25_recency",
+    );
+
+    expect(methodA.diagnostics.finalChronologicalMessageIds)
+      .toContain("older-venue-cedar");
+    expect(methodA.diagnostics.finalChronologicalMessageIds)
+      .not.toContain("newer-venue-harbor");
+    expect(methodB.diagnostics.finalChronologicalMessageIds)
+      .toContain("newer-venue-harbor");
+    expect(methodB.diagnostics.finalChronologicalMessageIds)
+      .not.toContain("older-venue-cedar");
+  });
+
+  it("keeps old relevance and anchors without recent irrelevance", () => {
+    const result = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25_recency",
+    );
+    const selectedIds = result.diagnostics.finalChronologicalMessageIds;
+
+    expect(selectedIds).toContain("strong-older-venue-contract");
+    expect(selectedIds).not.toContain("recent-irrelevant-lunch");
+    expect(selectedIds).not.toContain("recent-irrelevant-book");
+    expect(selectedIds).toEqual(expect.arrayContaining([
+      "anchor-current-venue",
+      "anchor-latest-update",
+      "anchor-which-venue",
+    ]));
+    expect(result.selectedMessages.length).toBeLessThanOrEqual(
+      baselineMessageLimit,
+    );
+    expect(result.estimatedContextTokens)
+      .toBeLessThanOrEqual(result.estimatedBaselineTokens);
+  });
+
+  it("restores Method B output chronologically and is reproducible", () => {
+    const first = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25_recency",
+    );
+    const second = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25_recency",
+    );
+    const indexes = first.selectedMessages.map(
+      ({chronologicalIndex}) => chronologicalIndex,
+    );
+
+    expect(indexes).toEqual([...indexes].sort((left, right) => left - right));
+    expect(second.diagnostics).toEqual(first.diagnostics);
+  });
+
+  it("makes alpha one match Method A relevance selection", () => {
+    const methodA = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25",
+    );
+    const alphaOne = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25_recency",
+      {recencyParameters: {alpha: 1, halfLifeDays: 7}},
+    );
+
+    expect(alphaOne.diagnostics.finalChronologicalMessageIds)
+      .toEqual(methodA.diagnostics.finalChronologicalMessageIds);
   });
 });

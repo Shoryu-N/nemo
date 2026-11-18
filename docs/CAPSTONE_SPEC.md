@@ -35,9 +35,19 @@ The Capstone will implement and compare:
 
 1. **Baseline:** latest 20 valid messages.
 2. **Method A:** BM25 lexical relevance selection.
-3. **Method B:** BM25 plus recency scoring, in a future iteration.
-4. **Method C:** BM25 plus recency scoring and Maximal Marginal Relevance, in a
-   future iteration.
+3. **Method B:** BM25 plus recency scoring.
+4. **Method C:** BM25 plus recency scoring and Maximal Marginal Relevance
+   (MMR).
+5. **Method D:** BM25 plus MMR, without recency scoring.
+
+Methods A-D form a controlled four-arm comparison. Separating Method B's
+recency component from Methods C and D's diversity component allows the study
+to attribute observed selection differences to recency, diversity, or their
+combination instead of changing both factors in one comparison.
+
+**Method E**, BM25 plus Pseudo-Relevance Feedback (PRF), is planned as separate
+future work. PRF will investigate classical, model-free query expansion rather
+than the recency/diversity factor comparison.
 
 Iteration 1 asks whether BM25-based selection can retrieve messages that are
 lexically relevant to the current topic from a larger bounded history while
@@ -45,6 +55,11 @@ maintaining a context budget comparable to the baseline.
 
 Iteration 1 does not claim that BM25 is semantically aware or that it improves
 AI output quality.
+
+Iteration 2 completed a literature review of BM25 extensions and alternatives
+and produced the revised experimental design above. Iteration 3 implements
+Methods B, C, and D incrementally. Method B is implemented first; Methods C and
+D remain planned and are not enabled by this specification revision.
 
 ## 4. Preserved Study Project Baseline
 
@@ -66,9 +81,11 @@ The following behavior remains unchanged:
 The Baseline strategy remains the latest 20 valid messages, in chronological
 order, with no BM25 processing.
 
-## 5. Iteration 1 Scope
+## 5. Iteration Status and Scope
 
-Iteration 1 will add:
+### 5.1 Iteration 1 -- Completed
+
+Iteration 1 added:
 
 - An independently testable BM25 implementation in TypeScript.
 - A backend strategy selector supporting `baseline` and `bm25`.
@@ -80,8 +97,23 @@ Iteration 1 will add:
 - A correction so the frontend displays the latest 100 messages in
   chronological order rather than the oldest 100.
 
-Recency scoring, MMR, embeddings, external retrieval APIs, and persistent
-long-term AI memory are excluded from Iteration 1.
+### 5.2 Iteration 2 -- Completed
+
+Iteration 2 reviewed alternatives and extensions to BM25 and revised the
+research design to separate recency scoring from diversity-based selection.
+It made no production context-selection strategy change.
+
+### 5.3 Iteration 3 -- In Progress
+
+Method B is implemented first in Iteration 3. It adds BM25 score normalization,
+exponential timestamp-based recency, a third backend/frontend strategy, a
+recency-specific deterministic fixture, explainable local diagnostics, and
+focused tests. Methods C and D remain planned within Iteration 3 and are not
+callable or selectable yet.
+
+Embeddings, external retrieval APIs, trained retrieval models, and persistent
+long-term AI memory remain excluded. Method E is future work rather than part
+of the current implementation.
 
 ## 6. Context-Selection Architecture
 
@@ -106,14 +138,15 @@ The callable request is:
 ```ts
 {
   replyAs: "alice" | "bob";
-  strategy: "baseline" | "bm25";
+  strategy: "baseline" | "bm25" | "bm25_recency";
 }
 ```
 
 Both fields are required and unexpected fields are rejected. Future strategy
-names remain invalid until their corresponding iteration enables them. The
-callable response retains the exact Study Project result shape and does not
-expose selection diagnostics.
+names, including Methods C, D, and E, remain invalid until their implementation
+is enabled. Ranking parameters are internal and are not accepted from clients.
+The callable response retains the exact Study Project result shape and does
+not expose selection diagnostics.
 
 ## 7. Candidate Retrieval
 
@@ -123,11 +156,12 @@ The backend retrieves at most the latest 20 Firestore message documents for the
 Baseline strategy. Valid messages are restored to chronological order and sent
 without BM25 scoring.
 
-### 7.2 BM25
+### 7.2 BM25-Based Methods
 
 The backend retrieves at most the latest 100 Firestore message documents for
-Method A. This is a bounded research window, not unbounded memory. Invalid
-records are excluded using the existing message validation.
+Methods A and B. This is a bounded research window, not unbounded memory.
+Invalid records, including records without a valid Firestore timestamp, are
+excluded using backend validation.
 
 Firestore results use creation time plus document ID for deterministic ordering
 when timestamps are equal. Each valid candidate receives a stable chronological
@@ -206,12 +240,57 @@ backfill is an edge-case policy, not a recency component added to BM25 scores.
 - Exact score ties use chronological ordinal and then message ID.
 - The final selected set is restored to chronological order before AI use.
 
-## 9. Frontend Strategy Behavior
+Method A remains BM25-only. Its scores, ranking behavior, and selection results
+are not altered by enabling Method B.
+
+## 9. Method B: BM25 Plus Recency Specification
+
+### 9.1 Purpose
+
+Method B tests whether an explicit recency signal helps prefer a newer relevant
+revision over an older message with comparable lexical relevance. It does not
+treat recency as relevance: a message must have a positive BM25 score before it
+is eligible for combined-score selection.
+
+### 9.2 Normalization and Recency
+
+For eligible historical candidate `d`:
+
+```text
+normalizedBM25(d) = BM25(d) / maxBM25
+recency(d) = 2 ^ (-ageDays(d) / halfLifeDays)
+combinedScore(d) =
+  alpha * normalizedBM25(d) + (1 - alpha) * recency(d)
+```
+
+`maxBM25` is the highest BM25 score among the historical candidates for the
+current query. A zero maximum produces normalized scores of zero without
+division by zero. `ageDays` is measured relative to the latest valid
+conversation-message timestamp, not wall-clock time, so identical histories
+produce identical results. Future-dated candidates are treated as age zero;
+invalid timestamps or decay parameters contribute no recency score.
+
+The provisional defaults are `alpha = 0.75` and `halfLifeDays = 7`. These are
+configurable internal TypeScript parameters and experimental starting values,
+not optimized or empirically validated values. They are not client inputs.
+
+### 9.3 Selection Behavior
+
+Method B uses Method A's latest-three query construction, 100-message candidate
+bound, 20-message cap, estimated Baseline token budget, anchor reservation,
+fallback/backfill policy, and chronological output restoration. Only positive
+BM25 candidates are ranked by the combined score. Therefore a recent
+lexically irrelevant message cannot displace a relevant ranked candidate solely
+through recency. Exact ties use BM25 score, chronological ordinal, and message
+ID for deterministic resolution.
+
+## 10. Frontend Strategy Behavior
 
 The AI panel provides:
 
 - `Baseline — Latest 20 Messages`
 - `Method A — BM25`
+- `Method B — BM25 + Recency`
 
 Baseline is the default. The selected strategy is included in every callable
 request. Changing strategy clears displayed Alice and Bob analyses and errors
@@ -222,7 +301,7 @@ invalidated result from appearing later.
 Analysis and Use Reply continue to create no message. Only the existing Send
 action writes a message.
 
-## 10. Measurements and Diagnostic Visibility
+## 11. Measurements and Diagnostic Visibility
 
 Production structured logs may include only:
 
@@ -240,16 +319,23 @@ Firebase user IDs, credentials, or AI output.
 
 Pure selector diagnostics are available only to tests and local development
 fixtures. They expose fictional candidate IDs, BM25 scores, selected IDs, final
-chronological IDs, budget skips, and fallback behavior. They are not returned by
-the callable or written to production logs.
+chronological IDs, budget skips, and fallback behavior. Method B diagnostics
+also expose normalized BM25 score, age in days, recency score, combined score,
+ranking position, and final inclusion. They are not returned by the callable or
+written to production logs.
 
-## 11. Testing and Acceptance Criteria
+## 12. Testing and Acceptance Criteria
 
 Automated tests cover tokenization, term frequency, IDF, document-length
 normalization, relevance ranking, missing terms, empty queries, empty histories,
 small candidate sets, deterministic ties, anchor preservation, budget behavior,
 chronological restoration, Baseline preservation, callable validation, and
 authentication.
+
+Method B tests additionally cover exponential decay landmarks, invalid input,
+BM25 normalization, combined ranking, deterministic ties, the positive-BM25
+eligibility gate, alpha-one BM25 equivalence, anchors, budgets, chronological
+output, callable validation, and frontend strategy availability.
 
 A deterministic fictional fixture contains more than 20 messages. An important
 older message outside the Baseline window shares lexical terms with the latest
@@ -261,11 +347,16 @@ A negative fixture contains conceptually related messages with no shared lexical
 terms. It demonstrates that BM25 can miss relevant information because lexical
 matching is not semantic similarity.
 
+A separate deterministic recency fixture contains older and newer messages with
+comparable lexical relevance, a revised fact, recent irrelevant messages, and
+three anchors. It is a constructed functional test of expected ranking and
+budget behavior, not evidence of general performance superiority.
+
 The complete Study Project unit, Security Rules, integration, lint, and build
 checks must continue to pass unless an assertion is intentionally updated for
 the required callable contract.
 
-## 12. Evaluation Methodology
+## 13. Evaluation Methodology
 
 Context selection will be evaluated separately from OpenAI generation using
 fictional histories with reference relevant-message IDs and important-fact
@@ -285,9 +376,11 @@ human review where practical.
 
 No quality improvement will be claimed without measured evidence.
 
-## 13. Technical Constraints and Limitations
+## 14. Technical Constraints and Limitations
 
 - BM25 measures lexical relevance, not semantic similarity.
+- Recency measures age, not truth, importance, or semantic relevance.
+- The provisional alpha and half-life have not been optimized or validated.
 - Synonyms and paraphrases can cause false negatives.
 - Repeated terms and message length influence scores.
 - Individual-message ranking can reduce conversational coherence.
@@ -299,7 +392,7 @@ No quality improvement will be claimed without measured evidence.
 - The prototype and evaluation datasets remain small and fictional.
 - The project is not production-ready and does not provide long-term AI memory.
 
-## 14. Differences from the Original Study Project
+## 15. Differences from the Original Study Project
 
 Iteration 1 changes the callable input from `{ replyAs }` to the required
 `{ replyAs, strategy }`, adds a larger bounded candidate read for BM25, adds a
@@ -310,22 +403,31 @@ It does not change Firestore Security Rules, message writes, the AI output
 contract, secret handling, supported users or rooms, or human control over
 sending.
 
-## 15. Iterations and Milestones
+Iteration 3 adds `bm25_recency`, carries valid message timestamps into the pure
+selector, and adds local-only recency diagnostics. It leaves the OpenAI model,
+prompt, structured schema, and explicit user approval behavior unchanged.
+
+## 16. Iterations and Milestones
 
 ### Iteration 1
 
-Baseline, BM25, selector UI, validation, measurements, deterministic fixtures,
-and full regression testing.
+**Completed:** Baseline, BM25, selector UI, validation, measurements,
+deterministic fixtures, and regression testing.
 
-### Future Iteration 2
+### Iteration 2
 
-Introduce and evaluate an explicit recency score while keeping Method A
-available unchanged.
+**Completed:** literature review and revised controlled experimental design.
 
-### Future Iteration 3
+### Iteration 3
 
-Introduce and evaluate MMR for relevance/diversity trade-offs while keeping all
-earlier strategies available unchanged.
+**In progress:** Method B (BM25 + Recency) is implemented and verified first.
+Methods C (BM25 + Recency + MMR) and D (BM25 + MMR) are planned but not yet
+implemented or exposed.
+
+### Future Work
+
+**Planned:** Method E (BM25 + PRF) as a separate classical, model-free query
+expansion investigation.
 
 Deployment to Firebase Hosting or production Cloud Functions requires separate
 explicit approval.

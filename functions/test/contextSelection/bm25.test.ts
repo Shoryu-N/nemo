@@ -15,6 +15,7 @@ function candidate(
   return {
     id,
     chronologicalIndex,
+    createdAtMillis: Date.UTC(2026, 0, 1 + chronologicalIndex),
     senderId: "alice",
     senderName: "Alice",
     text,

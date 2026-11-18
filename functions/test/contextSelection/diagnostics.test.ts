@@ -5,6 +5,7 @@ import type {ContextSelectionDiagnostics} from
 import {
   lexicalMatchFixture,
   lexicalMismatchFixture,
+  recencyComparisonFixture,
 } from "../fixtures/contextSelectionFixtures";
 
 const showDiagnostics = process.env.SHOW_CONTEXT_DIAGNOSTICS === "true";
@@ -30,6 +31,31 @@ describe("fictional context-selection diagnostics", () => {
     expect(result.diagnostics.rankedCandidates.find(
       ({messageId}) => messageId === "older-automobile-detail",
     )?.score).toBe(0);
+  });
+
+  it("exposes explainable Method A and Method B fixture diagnostics", () => {
+    const methodA = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25",
+    );
+    const methodB = selectConversationContext(
+      recencyComparisonFixture,
+      "bm25_recency",
+    );
+
+    printDiagnostics("recency-method-a", methodA.diagnostics);
+    printDiagnostics("recency-method-b", methodB.diagnostics);
+
+    expect(methodB.diagnostics.rankedCandidates).toHaveLength(21);
+    expect(methodB.diagnostics.rankedCandidates.every((candidate) => (
+      candidate.bm25Score !== undefined &&
+      candidate.normalizedBm25Score !== undefined &&
+      candidate.ageDays !== undefined &&
+      candidate.recencyScore !== undefined &&
+      candidate.combinedScore !== undefined &&
+      candidate.rankingPosition !== undefined &&
+      candidate.includedInFinalContext !== undefined
+    ))).toBe(true);
   });
 });
 

@@ -256,7 +256,7 @@ describe('Firebase emulator integration', () => {
     await expect(
       functionsModule.analyzeConversation({
         replyAs: 'alice',
-        strategy: 'bm25_recency',
+        strategy: 'bm25_mmr',
       } as Parameters<typeof functionsModule.analyzeConversation>[0]),
     ).rejects.toMatchObject({
       code: 'functions/invalid-argument',
@@ -271,7 +271,7 @@ describe('Firebase emulator integration', () => {
     })
   })
 
-  it.each(['baseline', 'bm25'] as const)(
+  it.each(['baseline', 'bm25', 'bm25_recency'] as const)(
     'INT-006 returns empty-conversation analysis for %s without OpenAI',
     async (strategy) => {
       await signInAnonymously()

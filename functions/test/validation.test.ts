@@ -32,6 +32,16 @@ describe("validateAnalyzeConversationInput", () => {
     });
   });
 
+  it("accepts Method B with the BM25 plus recency strategy", () => {
+    expect(validateAnalyzeConversationInput({
+      replyAs: "alice",
+      strategy: "bm25_recency",
+    })).toEqual({
+      replyAs: "alice",
+      strategy: "bm25_recency",
+    });
+  });
+
   it("rejects a missing replyAs", () => {
     expect(() => validateAnalyzeConversationInput({strategy: "baseline"}))
       .toThrow(
@@ -84,14 +94,14 @@ describe("validateAnalyzeConversationInput", () => {
     expect(() => validateAnalyzeConversationInput({
       replyAs: "alice",
       strategy: "semantic",
-    })).toThrow("strategy must be either baseline or bm25.");
+    })).toThrow("strategy must be baseline, bm25, or bm25_recency.");
   });
 
   it("rejects future strategies that are not enabled", () => {
     expect(() => validateAnalyzeConversationInput({
       replyAs: "alice",
-      strategy: "bm25_recency",
-    })).toThrow("strategy must be either baseline or bm25.");
+      strategy: "bm25_mmr",
+    })).toThrow("strategy must be baseline, bm25, or bm25_recency.");
   });
 
   it("rejects unexpected extra fields", () => {

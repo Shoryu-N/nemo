@@ -20,6 +20,7 @@ This project is **not a production-ready messaging platform**. It was implemente
 - Selectable conversation context strategy:
   - Baseline — latest 20 messages
   - Method A — BM25 lexical relevance selection
+  - Method B — BM25 plus reproducible recency scoring
 - AI output containing:
   - `summary`
   - `importantInformation`
@@ -77,7 +78,7 @@ Only the backend Cloud Function calls OpenAI. The OpenAI API key is never placed
 2. The user sends and receives text messages in the fixed `main` room.
 3. The user explicitly clicks Analyze Conversation.
 4. The callable function retrieves a bounded valid-message history and applies
-   the selected Baseline or BM25 context strategy.
+   the selected Baseline, BM25, or BM25 + Recency context strategy.
 5. At most 20 selected messages are restored to chronological order and sent to
    OpenAI for structured analysis.
 6. The frontend displays the summary, important information, and suggested reply.
@@ -99,6 +100,13 @@ anchors, and uses BM25 to rank older candidates. Selection is limited to 20
 messages and an approximate character-based token budget comparable to the
 Baseline window. The selected set is restored to chronological order before AI
 analysis.
+
+Method B reuses the same query, anchors, candidate bound, and context budget.
+It normalizes BM25 and combines it with exponential timestamp decay using the
+latest conversation timestamp as the reference. Its provisional internal
+parameters are `alpha = 0.75` and `halfLifeDays = 7`. Only candidates with a
+positive BM25 score are eligible, so recency alone cannot select an irrelevant
+message.
 
 BM25 is lexical retrieval, not semantic similarity. It may retrieve older facts
 that share query wording, but it may miss synonyms or globally important facts
@@ -255,6 +263,56 @@ sending additional messages after seeding. Baseline uses messages 5-24 and
 therefore excludes the blue-folder fact in message 2; Method A should retrieve
 that fact from the larger candidate history while retaining messages 22-24 as
 anchors.
+
+### Compare Method A and Method B with the recency fixture
+
+This is a constructed functional comparison, not evidence that Method B is
+generally superior. Start with an empty ephemeral Emulator Suite:
+
+```bash
+firebase emulators:start --project nemo-chat-app-645d
+```
+
+In a second terminal, seed the deterministic 24-message Aurora Venue fixture:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed:recency
+```
+
+The seeder uses explicit timestamps spread across days and weeks, is
+idempotent, accepts only a loopback Firestore Emulator, rejects production
+credentials, and refuses to alter a room containing unrelated or conflicting
+documents.
+
+Start the frontend in a third terminal:
+
+```bash
+npm run dev
+```
+
+Open the local Vite URL. Select `Method A — BM25`, explicitly run Analyze
+Conversation, and record Summary, Important Information, and Suggested Reply.
+Then select `Method B — BM25 + Recency`, confirm that the previous analysis is
+invalidated while any message draft remains, and explicitly run Analyze
+Conversation again. No request runs merely by switching strategies.
+
+For the deterministic selector behavior, Method A includes the older Cedar
+Hall revision and excludes the newer comparable Harbor Hall revision at the
+fixture's context budget. Method B includes Harbor Hall and excludes Cedar
+Hall. Both retain the strongly relevant old contract message and all three
+anchors; the recent lunch and book messages remain excluded. Inspect the exact
+fictional-ID ranking and scores without OpenAI:
+
+```bash
+SHOW_CONTEXT_DIAGNOSTICS=true npm --prefix functions test -- test/contextSelection/diagnostics.test.ts --reporter=verbose
+```
+
+Method B diagnostics show message ID, original and normalized BM25, age in
+days, recency, combined score, rank, and final inclusion. These details are
+test-only and are not returned by the callable or logged in production. Any
+difference in generated Summary, Important Information, or Suggested Reply
+must be recorded as a manual observation; the fixture alone does not establish
+an AI-output improvement.
 
 Run emulator-backed test suites:
 
