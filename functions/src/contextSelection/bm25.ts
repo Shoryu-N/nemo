@@ -13,9 +13,13 @@ type Bm25Parameters = {
   b: number;
 };
 
-type RankedCandidate = {
+export type RankedCandidate = {
   candidate: ContextCandidate;
   score: number;
+};
+
+export type NormalizedBm25Candidate = RankedCandidate & {
+  normalizedScore: number;
 };
 
 const tokenPattern = new RegExp("[\\p{L}\\p{N}]+", "gu");
@@ -133,6 +137,23 @@ export function rankCandidatesByBm25(
 
       return left.candidate.id.localeCompare(right.candidate.id);
     });
+}
+
+/**
+ * Normalizes an already-ranked BM25 result without changing its order.
+ */
+export function normalizeBm25Scores(
+  rankedCandidates: RankedCandidate[],
+): NormalizedBm25Candidate[] {
+  const maxBm25 = rankedCandidates.reduce(
+    (maximum, {score}) => Math.max(maximum, score),
+    0,
+  );
+
+  return rankedCandidates.map((rankedCandidate) => ({
+    ...rankedCandidate,
+    normalizedScore: maxBm25 > 0 ? rankedCandidate.score / maxBm25 : 0,
+  }));
 }
 
 /**

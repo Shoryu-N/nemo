@@ -10,9 +10,37 @@ import {FieldPath, Timestamp, getFirestore} from "firebase-admin/firestore";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "../..");
 const frontendEnvironmentPath = join(repositoryRoot, ".env.local");
+const fixtureKind = process.argv[2] ?? "bm25";
+const fixtureConfigurations = {
+  bm25: {
+    displayName: "Projector Calibration",
+    expectedCount: 24,
+    fileName: "projectorCalibrationConversation.json",
+    commandName: "seed:bm25",
+  },
+  recency: {
+    displayName: "Aurora Venue Recency Comparison",
+    expectedCount: 24,
+    fileName: "recencyComparisonConversation.json",
+    commandName: "seed:recency",
+  },
+  mmr: {
+    displayName: "Orion Launch MMR Comparison",
+    expectedCount: 36,
+    fileName: "mmrLaunchConversation.json",
+    commandName: "seed:mmr",
+  },
+};
+const fixtureConfiguration = fixtureConfigurations[fixtureKind];
+
+if (!fixtureConfiguration) {
+  throw new Error("Fixture must be bm25, recency, or mmr.");
+}
+
 const fixturePath = join(
   repositoryRoot,
-  "functions/test/fixtures/projectorCalibrationConversation.json",
+  "functions/test/fixtures",
+  fixtureConfiguration.fileName,
 );
 const expectedFrontendKeys = new Set([
   "VITE_FIREBASE_PROJECT_ID",
@@ -40,7 +68,10 @@ async function main() {
   await verifyRunningEmulator(projectId, emulator);
 
   const fixture = await readFixture();
-  const app = initializeApp({projectId}, "bm25-fixture-seeder");
+  const app = initializeApp(
+    {projectId},
+    `${fixtureKind}-fixture-seeder`,
+  );
 
   try {
     const firestore = getFirestore(app);
@@ -97,7 +128,7 @@ async function main() {
     verifySeededConversation(verificationSnapshot.docs, expectedMessages);
 
     console.info(
-      "Seeded Projector Calibration fixture: " +
+      `Seeded ${fixtureConfiguration.displayName} fixture: ` +
       `${expectedMessages.length} messages present ` +
       `(created ${missingMessages.length}, updated 0).`,
     );
@@ -119,7 +150,8 @@ function parseEmulatorHost(rawHost) {
   if (!rawHost) {
     throw new Error(
       "FIRESTORE_EMULATOR_HOST is required. Example: " +
-      "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed:bm25",
+      "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run " +
+      fixtureConfiguration.commandName,
     );
   }
 
@@ -318,17 +350,25 @@ async function readFixture() {
   try {
     parsed = JSON.parse(await readFile(fixturePath, "utf8"));
   } catch {
-    throw new Error("The Projector Calibration fixture could not be loaded.");
+    throw new Error(
+      `The ${fixtureConfiguration.displayName} fixture could not be loaded.`,
+    );
   }
 
   if (
     !Array.isArray(parsed) ||
-    parsed.length !== 24 ||
+    parsed.length !== fixtureConfiguration.expectedCount ||
     parsed.some(({id, text}) => !id || typeof text !== "string") ||
-    new Set(parsed.map(({id}) => id)).size !== parsed.length
+    new Set(parsed.map(({id}) => id)).size !== parsed.length ||
+    (fixtureKind !== "bm25" && parsed.some(({senderId, createdAt}) => (
+      !["alice", "bob"].includes(senderId) ||
+      typeof createdAt !== "string" ||
+      !Number.isFinite(Date.parse(createdAt))
+    )))
   ) {
     throw new Error(
-      "The Projector Calibration fixture must contain 24 unique messages.",
+      `The ${fixtureConfiguration.displayName} fixture must contain ` +
+      `${fixtureConfiguration.expectedCount} unique valid messages.`,
     );
   }
 
@@ -336,18 +376,22 @@ async function readFixture() {
 }
 
 function buildExpectedMessages(fixture) {
-  return fixture.map(({id, text}, index) => {
-    const isAlice = index % 2 === 0;
+  return fixture.map(({id, text, senderId, createdAt}, index) => {
+    const resolvedSenderId = fixtureKind !== "bm25" ?
+      senderId : (index % 2 === 0 ? "alice" : "bob");
+    const createdAtTimestamp = fixtureKind !== "bm25" ?
+      Timestamp.fromMillis(Date.parse(createdAt)) :
+      Timestamp.fromMillis(
+        fixtureStartMillis + index * fixtureIntervalMillis,
+      );
 
     return {
       id,
       data: {
-        senderId: isAlice ? "alice" : "bob",
-        senderName: isAlice ? "Alice" : "Bob",
+        senderId: resolvedSenderId,
+        senderName: resolvedSenderId === "alice" ? "Alice" : "Bob",
         text,
-        createdAt: Timestamp.fromMillis(
-          fixtureStartMillis + index * fixtureIntervalMillis,
-        ),
+        createdAt: createdAtTimestamp,
       },
     };
   });
@@ -370,7 +414,9 @@ function matchesExpectedData(actual, expected) {
 function verifySeededConversation(documents, expectedMessages) {
   if (documents.length !== expectedMessages.length) {
     throw new Error(
-      `Verification failed: expected 24 messages, found ${documents.length}.`,
+      "Verification failed: expected " +
+      `${fixtureConfiguration.expectedCount} messages, ` +
+      `found ${documents.length}.`,
     );
   }
 
@@ -391,6 +437,7 @@ function verifySeededConversation(documents, expectedMessages) {
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : "Unknown error.";
-  console.error(`BM25 fixture seed failed: ${message}`);
+  console.error(`${fixtureConfiguration.displayName} fixture seed failed: ` +
+    message);
   process.exitCode = 1;
 });

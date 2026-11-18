@@ -1,0 +1,146 @@
+[
+  {
+    "id": "strong-older-venue-contract",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue contract Aurora launch checklist.",
+    "createdAt": "2026-01-01T09:00:00.000Z"
+  },
+  {
+    "id": "older-venue-cedar",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: Cedar Hall was confirmed.",
+    "createdAt": "2026-01-08T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-02",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: access desk was confirmed.",
+    "createdAt": "2026-01-10T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-03",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: loading route was confirmed.",
+    "createdAt": "2026-01-12T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-04",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: badge table was confirmed.",
+    "createdAt": "2026-01-14T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-05",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: welcome sign was confirmed.",
+    "createdAt": "2026-01-16T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-06",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: stage marks were confirmed.",
+    "createdAt": "2026-01-18T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-07",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: cable covers were confirmed.",
+    "createdAt": "2026-01-20T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-08",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: seating map was confirmed.",
+    "createdAt": "2026-01-22T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-09",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: sound booth was confirmed.",
+    "createdAt": "2026-01-24T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-10",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: camera zone was confirmed.",
+    "createdAt": "2026-01-26T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-11",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: power panel was confirmed.",
+    "createdAt": "2026-01-28T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-12",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: quiet room was confirmed.",
+    "createdAt": "2026-01-30T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-13",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: first aid was confirmed.",
+    "createdAt": "2026-02-01T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-14",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: coat rack was confirmed.",
+    "createdAt": "2026-02-03T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-15",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: water station was confirmed.",
+    "createdAt": "2026-02-05T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-16",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: parking gate was confirmed.",
+    "createdAt": "2026-02-07T09:00:00.000Z"
+  },
+  {
+    "id": "relevant-17",
+    "senderId": "bob",
+    "text": "Aurora launch checklist venue note: elevator key was confirmed.",
+    "createdAt": "2026-02-09T09:00:00.000Z"
+  },
+  {
+    "id": "newer-venue-harbor",
+    "senderId": "alice",
+    "text": "Aurora launch checklist venue note: Harbor Hall was confirmed.",
+    "createdAt": "2026-02-23T09:00:00.000Z"
+  },
+  {
+    "id": "recent-irrelevant-lunch",
+    "senderId": "bob",
+    "text": "Soup delivery arrived at noon.",
+    "createdAt": "2026-02-27T09:00:00.000Z"
+  },
+  {
+    "id": "recent-irrelevant-book",
+    "senderId": "alice",
+    "text": "Borrowed history book returned today.",
+    "createdAt": "2026-02-28T09:00:00.000Z"
+  },
+  {
+    "id": "anchor-current-venue",
+    "senderId": "bob",
+    "text": "What is the current Aurora launch checklist venue?",
+    "createdAt": "2026-03-01T09:00:00.000Z"
+  },
+  {
+    "id": "anchor-latest-update",
+    "senderId": "alice",
+    "text": "Please verify the latest Aurora launch checklist venue update.",
+    "createdAt": "2026-03-01T17:00:00.000Z"
+  },
+  {
+    "id": "anchor-which-venue",
+    "senderId": "bob",
+    "text": "Which Aurora launch checklist venue should we use?",
+    "createdAt": "2026-03-02T09:00:00.000Z"
+  }
+]

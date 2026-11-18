@@ -32,6 +32,26 @@ describe("validateAnalyzeConversationInput", () => {
     });
   });
 
+  it("accepts Method B with the BM25 plus recency strategy", () => {
+    expect(validateAnalyzeConversationInput({
+      replyAs: "alice",
+      strategy: "bm25_recency",
+    })).toEqual({
+      replyAs: "alice",
+      strategy: "bm25_recency",
+    });
+  });
+
+  it.each(["bm25_recency_mmr", "bm25_mmr"] as const)(
+    "accepts implemented MMR strategy %s",
+    (strategy) => {
+      expect(validateAnalyzeConversationInput({
+        replyAs: "bob",
+        strategy,
+      })).toEqual({replyAs: "bob", strategy});
+    },
+  );
+
   it("rejects a missing replyAs", () => {
     expect(() => validateAnalyzeConversationInput({strategy: "baseline"}))
       .toThrow(
@@ -84,14 +104,18 @@ describe("validateAnalyzeConversationInput", () => {
     expect(() => validateAnalyzeConversationInput({
       replyAs: "alice",
       strategy: "semantic",
-    })).toThrow("strategy must be either baseline or bm25.");
+    })).toThrow(
+      "strategy must be one of the five implemented context strategies.",
+    );
   });
 
   it("rejects future strategies that are not enabled", () => {
     expect(() => validateAnalyzeConversationInput({
       replyAs: "alice",
-      strategy: "bm25_recency",
-    })).toThrow("strategy must be either baseline or bm25.");
+      strategy: "bm25_prf",
+    })).toThrow(
+      "strategy must be one of the five implemented context strategies.",
+    );
   });
 
   it("rejects unexpected extra fields", () => {

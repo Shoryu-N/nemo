@@ -20,6 +20,9 @@ This project is **not a production-ready messaging platform**. It was implemente
 - Selectable conversation context strategy:
   - Baseline — latest 20 messages
   - Method A — BM25 lexical relevance selection
+  - Method B — BM25 plus reproducible recency scoring
+  - Method C — BM25 plus recency and MMR diversity selection
+  - Method D — BM25 plus MMR diversity selection, without recency
 - AI output containing:
   - `summary`
   - `importantInformation`
@@ -77,7 +80,7 @@ Only the backend Cloud Function calls OpenAI. The OpenAI API key is never placed
 2. The user sends and receives text messages in the fixed `main` room.
 3. The user explicitly clicks Analyze Conversation.
 4. The callable function retrieves a bounded valid-message history and applies
-   the selected Baseline or BM25 context strategy.
+   the selected Baseline or Method A-D context strategy.
 5. At most 20 selected messages are restored to chronological order and sent to
    OpenAI for structured analysis.
 6. The frontend displays the summary, important information, and suggested reply.
@@ -100,11 +103,37 @@ messages and an approximate character-based token budget comparable to the
 Baseline window. The selected set is restored to chronological order before AI
 analysis.
 
-BM25 is lexical retrieval, not semantic similarity. It may retrieve older facts
-that share query wording, but it may miss synonyms or globally important facts
-unrelated to the current topic. Any improvement in final AI output remains a
-hypothesis requiring evaluation. Detailed design and evaluation requirements
-are in `docs/CAPSTONE_SPEC.md`.
+Method B reuses the same query, anchors, candidate bound, and context budget.
+It normalizes BM25 and combines it with exponential timestamp decay using the
+latest conversation timestamp as the reference. Its provisional internal
+parameters are `alpha = 0.75` and `halfLifeDays = 7`. Only candidates with a
+positive BM25 score are eligible, so recency alone cannot select an irrelevant
+message.
+
+Methods C and D add one shared greedy Maximal Marginal Relevance (MMR)
+selector. Method C supplies Method B's combined BM25/recency score as
+relevance; Method D supplies normalized BM25 and has no timestamp-based
+relevance term. Both use the provisional internal value `lambda = 0.7`:
+
+```text
+MMR(d) = lambda * relevance(d)
+  - (1 - lambda) * maxSimilarity(d, selectedHistorical)
+```
+
+Similarity is dependency-free lexical TF-IDF cosine similarity over the same
+historical candidate corpus. The latest three messages remain mandatory
+anchors, but they do not contribute to the redundancy penalty. MMR is applied
+iteratively to positive-BM25 historical candidates; the existing 20-message
+cap, estimated Baseline token budget, fallback/backfill rules, and final
+chronological ordering remain unchanged. `lambda` is an experimental starting
+parameter, not an optimized value or a client request field.
+
+BM25 and TF-IDF similarity are lexical, not semantic. They may retrieve or
+compare messages that share wording, but may miss synonyms or globally
+important facts unrelated to the current topic. Diversity can also retain an
+outdated fact alongside a newer correction. Any improvement in final AI output
+remains a hypothesis requiring evaluation. Detailed design and evaluation
+requirements are in `docs/CAPSTONE_SPEC.md`.
 
 ## Project Structure
 
@@ -256,6 +285,121 @@ therefore excludes the blue-folder fact in message 2; Method A should retrieve
 that fact from the larger candidate history while retaining messages 22-24 as
 anchors.
 
+### Compare Method A and Method B with the recency fixture
+
+This is a constructed functional comparison, not evidence that Method B is
+generally superior. Start with an empty ephemeral Emulator Suite:
+
+```bash
+firebase emulators:start --project nemo-chat-app-645d
+```
+
+In a second terminal, seed the deterministic 24-message Aurora Venue fixture:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed:recency
+```
+
+The seeder uses explicit timestamps spread across days and weeks, is
+idempotent, accepts only a loopback Firestore Emulator, rejects production
+credentials, and refuses to alter a room containing unrelated or conflicting
+documents.
+
+Start the frontend in a third terminal:
+
+```bash
+npm run dev
+```
+
+Open the local Vite URL. Select `Method A — BM25`, explicitly run Analyze
+Conversation, and record Summary, Important Information, and Suggested Reply.
+Then select `Method B — BM25 + Recency`, confirm that the previous analysis is
+invalidated while any message draft remains, and explicitly run Analyze
+Conversation again. No request runs merely by switching strategies.
+
+For the deterministic selector behavior, Method A includes the older Cedar
+Hall revision and excludes the newer comparable Harbor Hall revision at the
+fixture's context budget. Method B includes Harbor Hall and excludes Cedar
+Hall. Both retain the strongly relevant old contract message and all three
+anchors; the recent lunch and book messages remain excluded. Inspect the exact
+fictional-ID ranking and scores without OpenAI:
+
+```bash
+SHOW_CONTEXT_DIAGNOSTICS=true npm --prefix functions test -- test/contextSelection/diagnostics.test.ts --reporter=verbose
+```
+
+Method B diagnostics show message ID, original and normalized BM25, age in
+days, recency, combined score, rank, and final inclusion. These details are
+test-only and are not returned by the callable or logged in production. Any
+difference in generated Summary, Important Information, or Suggested Reply
+must be recorded as a manual observation; the fixture alone does not establish
+an AI-output improvement.
+
+The completed manual comparison on this one constructed recency conversation
+was: Baseline selected Harbor Hall in 3.85 seconds, Method A selected Cedar
+Hall in 4.12 seconds, and Method B selected Harbor Hall in 3.99 seconds. Both
+retrieval methods retained the highly relevant 60-day-old message, used 19
+messages under the same 333-token estimate, kept all three anchors, and
+excluded recent lexical irrelevance. These are preliminary single-run
+observations, not statistically validated performance findings.
+
+### Compare Methods A-D with the MMR fixture
+
+Use an empty, ephemeral Emulator Suite. If another fictional dataset is
+present, stop the suite and restart it without `--import`; this safely clears
+the emulator's in-memory data. The seeder intentionally refuses to delete,
+overwrite, or mix with unrelated/conflicting room documents.
+
+```bash
+firebase emulators:start --project nemo-chat-app-645d
+```
+
+In a second terminal, seed the deterministic 36-message Orion Launch fixture:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed:mmr
+```
+
+The command has the same loopback-only, project-verification, credential
+rejection, conflict-detection, deterministic, and idempotent protections as
+the existing fixture seeders. A second identical run creates and updates zero
+documents.
+
+Inspect selection without calling OpenAI:
+
+```bash
+SHOW_CONTEXT_DIAGNOSTICS=true npm --prefix functions test -- \
+  test/contextSelection/diagnostics.test.ts --reporter=verbose
+```
+
+The fixture-only output includes per-candidate BM25/normalized BM25,
+Method C age and recency, MMR relevance, the selection iteration, maximum
+similarity and its selected-message ID, redundancy penalty, iteration-specific
+MMR score, final inclusion, budget skips, fallback/backfill status, final IDs,
+and compact strategy metrics. Distinct-fact coverage means the number of the
+eight predefined historical facts represented. Mean pairwise lexical
+similarity is the average TF-IDF cosine over unordered selected-historical
+pairs; a lower value does not itself mean better generated output.
+
+Start the frontend separately:
+
+```bash
+npm run dev
+```
+
+For each of Baseline and Methods A-D, select the strategy, explicitly click
+Analyze Conversation, and record Summary, Important Information, and Suggested
+Reply before switching. Switching clears stale analysis but preserves message
+drafts and does not start an analysis or send a reply. Inspect whether the
+output preserves these predefined facts: launch date, venue, equipment
+delivery, technical requirement, responsible team, access instruction, backup
+power, and safety contact. Also inspect the 12 repeated date confirmations,
+six repeated venue confirmations, and the Riverside-to-Harbor, east-to-west
+gate, and 08:30-to-09:00 revisions. The deterministic selector comparison
+shows redundancy reduction and broader fixture fact coverage for C/D, but both
+can retain old and new venue revisions. Generated-output quality remains for a
+separate manual OpenAI experiment.
+
 Run emulator-backed test suites:
 
 ```bash
@@ -383,7 +527,9 @@ These measurements are small-scale proof-of-concept observations and should not 
 
 ## Capstone Iteration 1 Automated Validation
 
-The following checks cover the current Baseline/BM25 implementation:
+The following table records the completed Iteration 1 validation baseline;
+current Method A-D verification is reported by the commands above and in the
+implementation handoff:
 
 | Category | Result |
 | --- | --- |
@@ -396,9 +542,10 @@ The following checks cover the current Baseline/BM25 implementation:
 | Functions TypeScript Build | Pass |
 | Frontend and Functions Lint | Pass |
 
-The Functions tests include deterministic fictional positive and lexical-mismatch
-fixtures. To inspect the fixture-only candidate IDs, BM25 scores, selected IDs,
-chronological output, and fallback assertions, run:
+The Functions tests include deterministic fictional positive, recency,
+lexical-mismatch, and MMR fixtures. To inspect fixture-only candidate scores,
+MMR iteration details, selected IDs, chronological output, metrics, and fallback
+assertions, run:
 
 ```bash
 SHOW_CONTEXT_DIAGNOSTICS=true npm --prefix functions test -- \
@@ -422,6 +569,10 @@ fallback categories.
 - No offline support
 - AI analysis uses limited recent conversation context
 - BM25 selection is lexical and can miss paraphrases or synonyms
+- TF-IDF cosine is lexical similarity, not semantic equivalence
+- MMR diversity can preserve complementary evidence but can also retain an
+  outdated fact alongside a newer correction
+- The provisional recency and MMR parameters are not empirically optimized
 - The BM25 candidate history is bounded to the latest 100 messages
 - Context token counts used during selection are character-based estimates, not
   exact OpenAI token counts

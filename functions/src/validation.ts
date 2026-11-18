@@ -8,7 +8,13 @@ import type {
 import type {ContextSelectionStrategy} from "./contextSelection/types";
 
 const displayUserIds = ["alice", "bob"];
-const contextSelectionStrategies = ["baseline", "bm25"];
+const contextSelectionStrategies = [
+  "baseline",
+  "bm25",
+  "bm25_recency",
+  "bm25_recency_mmr",
+  "bm25_mmr",
+];
 
 /**
  * Validates the callable request payload for analyzeConversation.
@@ -44,7 +50,7 @@ export function validateAnalyzeConversationInput(
   if (!isContextSelectionStrategy(data.strategy)) {
     throw new HttpsError(
       "invalid-argument",
-      "strategy must be either baseline or bm25.",
+      "strategy must be one of the five implemented context strategies.",
     );
   }
 
