@@ -3,7 +3,9 @@ import type {ConversationMessage} from "../types";
 export type ContextSelectionStrategy =
   | "baseline"
   | "bm25"
-  | "bm25_recency";
+  | "bm25_recency"
+  | "bm25_recency_mmr"
+  | "bm25_mmr";
 
 export type ContextCandidate = ConversationMessage & {
   id: string;
@@ -27,6 +29,15 @@ export type ScoredContextCandidate = {
   recencyScore?: number;
   combinedScore?: number;
   rankingPosition?: number;
+  relevanceScore?: number;
+  mmrSelectionIteration?: number;
+  mmrEvaluatedAfterIteration?: number;
+  maximumSimilarity?: number;
+  maximumSimilarityMessageId?: string;
+  redundancyPenalty?: number;
+  mmrScore?: number;
+  includedByMmr?: boolean;
+  skippedForBudget?: boolean;
   includedInFinalContext?: boolean;
 };
 

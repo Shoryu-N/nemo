@@ -3,6 +3,7 @@ import projectorCalibrationConversation from
   "./projectorCalibrationConversation.json";
 import recencyComparisonConversation from
   "./recencyComparisonConversation.json";
+import mmrLaunchConversation from "./mmrLaunchConversation.json";
 
 function message(
   id: string,
@@ -71,3 +72,31 @@ export const recencyComparisonFixture: ContextCandidate[] =
     senderName: fixtureMessage.senderId === "alice" ? "Alice" : "Bob",
     text: fixtureMessage.text,
   }));
+
+export const mmrComparisonFixture: ContextCandidate[] =
+  mmrLaunchConversation.map((fixtureMessage, index) => ({
+    id: fixtureMessage.id,
+    chronologicalIndex: index,
+    createdAtMillis: Date.parse(fixtureMessage.createdAt),
+    senderId: fixtureMessage.senderId as "alice" | "bob",
+    senderName: fixtureMessage.senderId === "alice" ? "Alice" : "Bob",
+    text: fixtureMessage.text,
+  }));
+
+export const mmrExpectedFactIds = [
+  "launch_date",
+  "venue",
+  "equipment_delivery",
+  "technical_requirement",
+  "responsible_team",
+  "access_instruction",
+  "backup_power",
+  "safety_contact",
+] as const;
+
+export const mmrFixtureMetadata = new Map(
+  mmrLaunchConversation.map(({id, factId, redundancyGroup}) => [id, {
+    factId,
+    redundancyGroup,
+  }]),
+);

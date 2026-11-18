@@ -13,6 +13,11 @@ const strategyOptions: Array<{
   { value: 'baseline', label: 'Baseline — Latest 20 Messages' },
   { value: 'bm25', label: 'Method A — BM25' },
   { value: 'bm25_recency', label: 'Method B — BM25 + Recency' },
+  {
+    value: 'bm25_recency_mmr',
+    label: 'Method C — BM25 + Recency + MMR',
+  },
+  { value: 'bm25_mmr', label: 'Method D — BM25 + MMR' },
 ]
 
 export function ContextStrategySelector({

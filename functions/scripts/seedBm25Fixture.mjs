@@ -24,11 +24,17 @@ const fixtureConfigurations = {
     fileName: "recencyComparisonConversation.json",
     commandName: "seed:recency",
   },
+  mmr: {
+    displayName: "Orion Launch MMR Comparison",
+    expectedCount: 36,
+    fileName: "mmrLaunchConversation.json",
+    commandName: "seed:mmr",
+  },
 };
 const fixtureConfiguration = fixtureConfigurations[fixtureKind];
 
 if (!fixtureConfiguration) {
-  throw new Error("Fixture must be either bm25 or recency.");
+  throw new Error("Fixture must be bm25, recency, or mmr.");
 }
 
 const fixturePath = join(
@@ -354,7 +360,7 @@ async function readFixture() {
     parsed.length !== fixtureConfiguration.expectedCount ||
     parsed.some(({id, text}) => !id || typeof text !== "string") ||
     new Set(parsed.map(({id}) => id)).size !== parsed.length ||
-    (fixtureKind === "recency" && parsed.some(({senderId, createdAt}) => (
+    (fixtureKind !== "bm25" && parsed.some(({senderId, createdAt}) => (
       !["alice", "bob"].includes(senderId) ||
       typeof createdAt !== "string" ||
       !Number.isFinite(Date.parse(createdAt))
@@ -371,9 +377,9 @@ async function readFixture() {
 
 function buildExpectedMessages(fixture) {
   return fixture.map(({id, text, senderId, createdAt}, index) => {
-    const resolvedSenderId = fixtureKind === "recency" ?
+    const resolvedSenderId = fixtureKind !== "bm25" ?
       senderId : (index % 2 === 0 ? "alice" : "bob");
-    const createdAtTimestamp = fixtureKind === "recency" ?
+    const createdAtTimestamp = fixtureKind !== "bm25" ?
       Timestamp.fromMillis(Date.parse(createdAt)) :
       Timestamp.fromMillis(
         fixtureStartMillis + index * fixtureIntervalMillis,

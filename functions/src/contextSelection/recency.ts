@@ -1,4 +1,4 @@
-import {rankCandidatesByBm25} from "./bm25";
+import {normalizeBm25Scores, rankCandidatesByBm25} from "./bm25";
 import type {
   ContextCandidate,
   ScoredContextCandidate,
@@ -65,15 +65,11 @@ export function rankCandidatesByBm25Recency(
   parameters: RecencyParameters = defaultRecencyParameters,
 ): RecencyRankedCandidate[] {
   const bm25Ranked = rankCandidatesByBm25(candidates, queryTerms);
-  const maxBm25 = bm25Ranked.reduce(
-    (maximum, {score}) => Math.max(maximum, score),
-    0,
-  );
+  const normalizedBm25 = normalizeBm25Scores(bm25Ranked);
   const safeAlpha = isValidAlpha(parameters.alpha) ? parameters.alpha : 1;
 
-  return bm25Ranked
-    .map(({candidate, score}) => {
-      const normalizedBm25Score = maxBm25 > 0 ? score / maxBm25 : 0;
+  return normalizedBm25
+    .map(({candidate, score, normalizedScore}) => {
       const ageDays = calculateAgeDays(
         candidate.createdAtMillis,
         referenceTimestampMillis,
@@ -87,10 +83,10 @@ export function rankCandidatesByBm25Recency(
       return {
         candidate,
         bm25Score: score,
-        normalizedBm25Score,
+        normalizedBm25Score: normalizedScore,
         ageDays,
         recencyScore,
-        combinedScore: safeAlpha * normalizedBm25Score +
+        combinedScore: safeAlpha * normalizedScore +
           (1 - safeAlpha) * recencyScore,
       };
     })

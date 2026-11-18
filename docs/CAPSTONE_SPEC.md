@@ -58,8 +58,8 @@ AI output quality.
 
 Iteration 2 completed a literature review of BM25 extensions and alternatives
 and produced the revised experimental design above. Iteration 3 implements
-Methods B, C, and D incrementally. Method B is implemented first; Methods C and
-D remain planned and are not enabled by this specification revision.
+Methods B, C, and D incrementally. Methods B-D are now implemented and enabled;
+manual OpenAI evaluation of Methods C and D remains pending.
 
 ## 4. Preserved Study Project Baseline
 
@@ -105,11 +105,13 @@ It made no production context-selection strategy change.
 
 ### 5.3 Iteration 3 -- In Progress
 
-Method B is implemented first in Iteration 3. It adds BM25 score normalization,
-exponential timestamp-based recency, a third backend/frontend strategy, a
+Method B adds BM25 score normalization, exponential timestamp-based recency, a
 recency-specific deterministic fixture, explainable local diagnostics, and
-focused tests. Methods C and D remain planned within Iteration 3 and are not
-callable or selectable yet.
+focused tests. Methods C and D are also implemented and exposed in the backend
+and frontend. They add shared lexical TF-IDF cosine similarity, one shared
+greedy MMR selector, an MMR-specific deterministic fixture, and iterative
+fixture-only diagnostics. Implementation and automated verification are
+complete; the planned manual OpenAI comparison for C/D has not yet been run.
 
 Embeddings, external retrieval APIs, trained retrieval models, and persistent
 long-term AI memory remain excluded. Method E is future work rather than part
@@ -138,15 +140,19 @@ The callable request is:
 ```ts
 {
   replyAs: "alice" | "bob";
-  strategy: "baseline" | "bm25" | "bm25_recency";
+  strategy:
+    | "baseline"
+    | "bm25"
+    | "bm25_recency"
+    | "bm25_recency_mmr"
+    | "bm25_mmr";
 }
 ```
 
 Both fields are required and unexpected fields are rejected. Future strategy
-names, including Methods C, D, and E, remain invalid until their implementation
-is enabled. Ranking parameters are internal and are not accepted from clients.
-The callable response retains the exact Study Project result shape and does
-not expose selection diagnostics.
+names, including Method E, remain invalid. Ranking parameters are internal and
+are not accepted from clients. The callable response retains the exact Study
+Project result shape and does not expose selection diagnostics.
 
 ## 7. Candidate Retrieval
 
@@ -159,7 +165,7 @@ without BM25 scoring.
 ### 7.2 BM25-Based Methods
 
 The backend retrieves at most the latest 100 Firestore message documents for
-Methods A and B. This is a bounded research window, not unbounded memory.
+Methods A-D. This is a bounded research window, not unbounded memory.
 Invalid records, including records without a valid Firestore timestamp, are
 excluded using backend validation.
 
@@ -284,13 +290,96 @@ lexically irrelevant message cannot displace a relevant ranked candidate solely
 through recency. Exact ties use BM25 score, chronological ordinal, and message
 ID for deterministic resolution.
 
-## 10. Frontend Strategy Behavior
+## 10. Methods C and D: Shared MMR Specification
+
+### 10.1 Dependency-Free Lexical Similarity
+
+Methods C and D build TF-IDF vectors for the same complete set of eligible
+historical candidate documents in each selection operation. They reuse Method
+A's tokenizer and use sparse term-weight maps:
+
+```text
+TF(t, d) = count(t, d)
+IDF(t) = ln((N + 1) / (DF(t) + 1)) + 1
+TFIDF(t, d) = TF(t, d) * IDF(t)
+
+cosine(a, b) = dot(a, b) / (norm(a) * norm(b))
+```
+
+`N` is the historical-candidate corpus size and `DF(t)` is the number of those
+documents containing `t`. Corpus statistics, sparse vectors, and the symmetric
+pairwise similarity matrix are computed once per selection operation where
+practical. A zero-magnitude vector has similarity zero, and floating-point
+results are clamped to `[0, 1]`. This is lexical similarity, not semantic
+equivalence; no embedding model, external service, or retrieval dependency is
+used.
+
+### 10.2 Greedy MMR Selection
+
+Both methods call the same iterative selector:
+
+```text
+MMR(d) = lambda * relevance(d)
+  - (1 - lambda) * maxSimilarity(d, selectedHistorical)
+```
+
+The provisional default is `lambda = 0.7`. It is an internal typed parameter
+for ablation tests, not a callable/frontend parameter, and is an experimental
+starting value rather than an optimized result. Invalid internal lambda values
+fall back safely to the default.
+
+The selector begins with no selected historical message, so the first
+redundancy penalty is zero. After every selection it recomputes each remaining
+candidate's penalty against all previously selected historical messages and
+uses the maximum pairwise similarity. A negative MMR score is still eligible:
+selection is relative. Parent relevance order resolves exact score ties, and
+duplicate message IDs cannot be selected.
+
+The latest three query messages remain mandatory anchors, but do not enter the
+similarity penalty. This prevents a historical message from being penalized
+merely for sharing the current query terms. Only historical candidates with a
+positive original BM25 score enter the primary MMR pool. The existing
+20-message limit, Baseline-derived estimated token budget, oversized-candidate
+handling, recent backfill, no-match fallback, and final chronological ordering
+apply to both methods without strategy-specific exceptions.
+
+### 10.3 Method C: BM25 + Recency + MMR
+
+Method C passes Method B's unchanged combined score to MMR:
+
+```text
+relevanceC(d) = 0.75 * normalizedBM25(d) + 0.25 * recency(d)
+MMR_C(d) = 0.7 * relevanceC(d)
+  - 0.3 * maxSimilarity(d, selectedHistorical)
+```
+
+The BM25 defaults remain `k1 = 1.2`, `b = 0.75`; the recency half-life remains
+seven days. No additional normalization is applied to Method B's combined
+score.
+
+### 10.4 Method D: BM25 + MMR Without Recency
+
+Method D passes normalized BM25 to the same MMR selector:
+
+```text
+relevanceD(d) = BM25(d) / maxBM25
+MMR_D(d) = 0.7 * relevanceD(d)
+  - 0.3 * maxSimilarity(d, selectedHistorical)
+```
+
+Method D has no exponential decay, recency-weighted relevance, or implicit
+timestamp bonus. It still shares the common latest-three anchors and recent
+backfill policy; those bounded-context policies are not scoring signals.
+
+## 11. Frontend Strategy Behavior
 
 The AI panel provides:
 
 - `Baseline — Latest 20 Messages`
 - `Method A — BM25`
 - `Method B — BM25 + Recency`
+- `Method C — BM25 + Recency + MMR`
+- `Method D — BM25 + MMR`
 
 Baseline is the default. The selected strategy is included in every callable
 request. Changing strategy clears displayed Alice and Bob analyses and errors
@@ -301,7 +390,7 @@ invalidated result from appearing later.
 Analysis and Use Reply continue to create no message. Only the existing Send
 action writes a message.
 
-## 11. Measurements and Diagnostic Visibility
+## 12. Measurements and Diagnostic Visibility
 
 Production structured logs may include only:
 
@@ -319,12 +408,14 @@ Firebase user IDs, credentials, or AI output.
 
 Pure selector diagnostics are available only to tests and local development
 fixtures. They expose fictional candidate IDs, BM25 scores, selected IDs, final
-chronological IDs, budget skips, and fallback behavior. Method B diagnostics
+chronological IDs, budget skips, and fallback behavior. Recency diagnostics
 also expose normalized BM25 score, age in days, recency score, combined score,
-ranking position, and final inclusion. They are not returned by the callable or
-written to production logs.
+ranking position, and final inclusion. MMR diagnostics add the relevance input,
+selection iteration, maximum similarity and responsible selected-message ID,
+redundancy penalty, iteration-specific MMR score, MMR inclusion, and budget
+skip. They are not returned by the callable or written to production logs.
 
-## 12. Testing and Acceptance Criteria
+## 13. Testing and Acceptance Criteria
 
 Automated tests cover tokenization, term frequency, IDF, document-length
 normalization, relevance ranking, missing terms, empty queries, empty histories,
@@ -336,6 +427,13 @@ Method B tests additionally cover exponential decay landmarks, invalid input,
 BM25 normalization, combined ranking, deterministic ties, the positive-BM25
 eligibility gate, alpha-one BM25 equivalence, anchors, budgets, chronological
 output, callable validation, and frontend strategy availability.
+
+Methods C and D add focused tests for the documented TF-IDF formula, cosine
+symmetry and empty vectors, iterative greedy MMR, maximum-similarity penalties,
+negative scores, duplicate IDs, deterministic ties, invalid lambda, count and
+budget constraints, lambda-one parent-method equivalence, absence of a Method D
+timestamp bonus, all anchors/fallbacks, strict callable validation, and all five
+frontend options.
 
 A deterministic fictional fixture contains more than 20 messages. An important
 older message outside the Baseline window shares lexical terms with the latest
@@ -352,11 +450,20 @@ comparable lexical relevance, a revised fact, recent irrelevant messages, and
 three anchors. It is a constructed functional test of expected ranking and
 budget behavior, not evidence of general performance superiority.
 
+The deterministic 36-message Orion Launch fixture defines eight reference
+facts and explicit redundancy groups. It contains 12 repeated launch-date
+confirmations, six repeated venue confirmations, complementary facts, old/new
+revisions, three recent irrelevant messages, and three multi-fact anchors. Its
+test assertions are based on the predefined annotations rather than inferred
+from implementation output. The emulator-only `npm run seed:mmr` command is
+deterministic, idempotent, loopback-restricted, production-credential guarded,
+and refuses unrelated or conflicting room data.
+
 The complete Study Project unit, Security Rules, integration, lint, and build
 checks must continue to pass unless an assertion is intentionally updated for
 the required callable contract.
 
-## 13. Evaluation Methodology
+## 14. Evaluation Methodology
 
 Context selection will be evaluated separately from OpenAI generation using
 fictional histories with reference relevant-message IDs and important-fact
@@ -376,11 +483,52 @@ human review where practical.
 
 No quality improvement will be claimed without measured evidence.
 
-## 14. Technical Constraints and Limitations
+### 14.1 Current Constructed-Fixture Observations
+
+For the Orion fixture, the estimated Baseline budget is 363 tokens. The
+deterministic selector produced:
+
+| Strategy | Messages | Est. tokens | Defined facts | Date repeats | Venue repeats | Mean pairwise lexical similarity |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline | 20 | 363 | 7 | 0 | 3 | 0.083 |
+| Method A | 16 | 362 | 2 | 11 | 0 | 0.715 |
+| Method B | 16 | 363 | 4 | 4 | 6 | 0.512 |
+| Method C | 18 | 356 | 8 | 1 | 3 | 0.125 |
+| Method D | 18 | 360 | 8 | 4 | 1 | 0.144 |
+
+Defined-fact coverage counts unique predefined fact IDs among selected
+historical messages. Redundancy counts are selected historical messages in the
+fixture's named groups. Mean pairwise lexical similarity is the average TF-IDF
+cosine over unordered selected-historical-message pairs. Lower similarity does
+not itself demonstrate a better summary or reply.
+
+On this constructed fixture, both MMR methods covered all eight defined facts
+and reduced repeated evidence relative to Method A/B, but both also selected
+the old Riverside and new Harbor venue revisions. This is a concrete temporal
+consistency trade-off: diversity does not determine which statement is true or
+current. On the separate recency fixture, Method C retained newer Harbor Hall;
+Method D did not, because it has no recency relevance component. On the
+Projector Calibration fixture Methods A-D preserved the older projector fact
+and all anchors. On the lexical-mismatch fixture Methods A-D all used the
+no-positive-match fallback and still missed the synonym-only old fact.
+
+The earlier one-run manual recency comparison observed Baseline selecting
+Harbor Hall in 3.85 seconds, Method A selecting Cedar Hall in 4.12 seconds, and
+Method B selecting Harbor Hall in 3.99 seconds. Methods A/B both retained the
+highly relevant 60-day-old message, selected 19 messages under the same
+333-token estimate, kept all anchors, and excluded recent lexical irrelevance.
+These and the deterministic fixture results are preliminary constructed-case
+observations, not statistically validated performance or generated-output
+quality claims. Manual OpenAI comparison of Methods C/D remains pending.
+
+## 15. Technical Constraints and Limitations
 
 - BM25 measures lexical relevance, not semantic similarity.
 - Recency measures age, not truth, importance, or semantic relevance.
-- The provisional alpha and half-life have not been optimized or validated.
+- TF-IDF cosine measures lexical similarity, not semantic equivalence.
+- MMR diversity does not resolve contradiction or temporal truth.
+- The provisional alpha, half-life, and lambda have not been optimized or
+  validated.
 - Synonyms and paraphrases can cause false negatives.
 - Repeated terms and message length influence scores.
 - Individual-message ranking can reduce conversational coherence.
@@ -392,7 +540,7 @@ No quality improvement will be claimed without measured evidence.
 - The prototype and evaluation datasets remain small and fictional.
 - The project is not production-ready and does not provide long-term AI memory.
 
-## 15. Differences from the Original Study Project
+## 16. Differences from the Original Study Project
 
 Iteration 1 changes the callable input from `{ replyAs }` to the required
 `{ replyAs, strategy }`, adds a larger bounded candidate read for BM25, adds a
@@ -403,11 +551,12 @@ It does not change Firestore Security Rules, message writes, the AI output
 contract, secret handling, supported users or rooms, or human control over
 sending.
 
-Iteration 3 adds `bm25_recency`, carries valid message timestamps into the pure
-selector, and adds local-only recency diagnostics. It leaves the OpenAI model,
-prompt, structured schema, and explicit user approval behavior unchanged.
+Iteration 3 adds `bm25_recency`, `bm25_recency_mmr`, and `bm25_mmr`; carries
+valid message timestamps into the pure selector; and adds local-only recency
+and iterative MMR diagnostics. It leaves the OpenAI model, prompt, structured
+schema, and explicit user approval behavior unchanged.
 
-## 16. Iterations and Milestones
+## 17. Iterations and Milestones
 
 ### Iteration 1
 
@@ -420,9 +569,9 @@ deterministic fixtures, and regression testing.
 
 ### Iteration 3
 
-**In progress:** Method B (BM25 + Recency) is implemented and verified first.
-Methods C (BM25 + Recency + MMR) and D (BM25 + MMR) are planned but not yet
-implemented or exposed.
+**In progress:** Methods B (BM25 + Recency), C (BM25 + Recency + MMR), and D
+(BM25 + MMR) are implemented, exposed, and automatically verified. The manual
+OpenAI output comparison for Methods C and D remains to be performed.
 
 ### Future Work
 

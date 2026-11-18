@@ -5,7 +5,7 @@ import {ContextStrategySelector} from
   '../../src/components/ContextStrategySelector'
 
 describe('context strategy selector options', () => {
-  it('exposes only the three implemented strategies with consistent values', () => {
+  it('exposes only the five implemented strategies with consistent values', () => {
     const markup = renderToStaticMarkup(createElement(
       ContextStrategySelector,
       {
@@ -21,7 +21,10 @@ describe('context strategy selector options', () => {
     expect(markup).toContain('Method A — BM25')
     expect(markup).toContain('value="bm25_recency" selected=""')
     expect(markup).toContain('Method B — BM25 + Recency')
-    expect(markup).not.toContain('MMR')
+    expect(markup).toContain('value="bm25_recency_mmr"')
+    expect(markup).toContain('Method C — BM25 + Recency + MMR')
+    expect(markup).toContain('value="bm25_mmr"')
+    expect(markup).toContain('Method D — BM25 + MMR')
     expect(markup).not.toContain('PRF')
   })
 })
